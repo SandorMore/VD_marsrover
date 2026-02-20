@@ -8,7 +8,7 @@
 #define WIDTH 800
 #define HEIGHT 600
 
-int main()
+int main(int d)
 {
 	InitWindow(WIDTH, HEIGHT, "Hello Raylib");
 	while (!WindowShouldClose()) {
