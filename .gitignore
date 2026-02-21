@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/c++,visualstudio
-# Edit at https://www.toptal.com/developers/gitignore?templates=c++,visualstudio
+# Created by https://www.toptal.com/developers/gitignore/api/c++,visualstudio,vcpkg
+# Edit at https://www.toptal.com/developers/gitignore?templates=c++,visualstudio,vcpkg
 
 ### C++ ###
 # Prerequisites
@@ -34,6 +34,14 @@
 *.exe
 *.out
 *.app
+
+### vcpkg ###
+# Vcpkg
+
+vcpkg-manifest-install.log
+
+## Manifest Mode
+vcpkg_installed/
 
 ### VisualStudio ###
 ## Ignore Visual Studio temporary files, build results, and
@@ -434,4 +442,4 @@ FodyWeavers.xsd
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 
-# End of https://www.toptal.com/developers/gitignore/api/c++,visualstudio
+# End of https://www.toptal.com/developers/gitignore/api/c++,visualstudio,vcpkg
