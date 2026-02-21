@@ -4,7 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#define IMG_ICON "i.png"
+#define IMG_ICON R"(..\x64\Debug\i.png)"
 
 
 Image load_img_for_icon(){

@@ -8,7 +8,7 @@
 
 int main()
 {
-    InitWindow(WIDTH, HEIGHT, "Hello Raylib");
+    InitWindow(WIDTH, HEIGHT, "Vad\xC3\xA1sz D\xC3\xA9nes Marsrover");
 
     Image icon = load_img_for_icon();
     SetWindowIcon(icon);
