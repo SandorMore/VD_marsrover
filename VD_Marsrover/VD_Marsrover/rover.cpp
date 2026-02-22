@@ -3,6 +3,7 @@
 
 using namespace std;
 
+// LogEntry metódusok
 string LogEntry::toString() const {
     stringstream ss;
     ss << timeStep << "," << x << "," << y << "," << battery << ","
@@ -11,18 +12,22 @@ string LogEntry::toString() const {
     return ss.str();
 }
 
+// Position metódusok
 Position::Position(int x, int y) : x(x), y(y) {}
 
 bool Position::operator==(const Position& other) const {
     return x == other.x && y == other.y;
 }
 
+// PositionHash metódus
 size_t PositionHash::operator()(const Position& p) const {
     return p.x * 53 + p.y;
 }
 
+// Cell metódusok
 Cell::Cell() : mineral(MINERAL_NONE), isObstacle(false), isStart(false) {}
 
+// RoverState metódusok
 RoverState::RoverState() : battery(MAX_BATTERY), isDay(true),
 dayTimeRemaining(DAY_DURATION), totalMinerals(0),
 timeElapsed(0), totalDistance(0) {
@@ -72,19 +77,38 @@ string RoverState::getStateId() const {
     return ss.str();
 }
 
+// AStarNode metódusok
 AStarNode::AStarNode(const RoverState& s, int gCost, int hCost,
     shared_ptr<AStarNode> p, const string& a)
     : state(s), g(gCost), h(hCost), f(gCost + hCost), parent(p), action(a) {
 }
 
 bool AStarNode::operator>(const AStarNode& other) const {
+    // 1. Több ásvány mindenképp jobb
     if (state.totalMinerals != other.state.totalMinerals)
         return state.totalMinerals < other.state.totalMinerals;
+
+    // 2. Ha ugyanannyi ásvány, akkor a nagyobb sebesség jobb (gyorsabban halad)
+    int lastSpeedThis = 0, lastSpeedOther = 0;
+    if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
+        string act = state.log.back().action;
+        lastSpeedThis = stoi(act.substr(5));
+    }
+    if (!other.state.log.empty() && other.state.log.back().action.find("MOVE") != string::npos) {
+        string act = other.state.log.back().action;
+        lastSpeedOther = stoi(act.substr(5));
+    }
+    if (lastSpeedThis != lastSpeedOther)
+        return lastSpeedThis < lastSpeedOther;
+
+    // 3. Ha ugyanolyan sebesség, akkor a kevesebb idõ jobb
     if (state.timeElapsed != other.state.timeElapsed)
         return state.timeElapsed > other.state.timeElapsed;
+
     return false;
 }
 
+// Távolság számítások
 int manhattanDistance(const Position& a, const Position& b) {
     return abs(a.x - b.x) + abs(a.y - b.y);
 }
@@ -93,6 +117,7 @@ int chebyshevDistance(const Position& a, const Position& b) {
     return max(abs(a.x - b.x), abs(a.y - b.y));
 }
 
+// Összes ásvány pozíciójának lekérése
 vector<Position> getAllMinerals(const vector<vector<Cell>>& map) {
     vector<Position> minerals;
     for (int i = 0; i < MAP_SIZE; i++) {
@@ -105,18 +130,30 @@ vector<Position> getAllMinerals(const vector<vector<Cell>>& map) {
     return minerals;
 }
 
+// Globális ásvány lista
 vector<Position> allMinerals;
 
+// Heurisztika - sebesség súlyozással
 int heuristic(const RoverState& state, int maxTime, const Position& startPos) {
     int timeLeft = maxTime - state.timeElapsed;
-    if (timeLeft <= 0) return 0;
+    if (timeLeft <= 0) return -1000;  // Ha elfogyott az idõ, nagyon rossz
 
     int remainingCount = allMinerals.size() - state.totalMinerals;
+
+    // Ha nincs több ásvány, vissza kell menni a startba
     if (remainingCount == 0) {
         int distToStart = chebyshevDistance(state.pos, startPos);
-        return (distToStart <= timeLeft) ? 1 : 0;
+        if (distToStart <= timeLeft) {
+            // Van idõ visszamenni -> ez jó megoldás
+            return 100;  // Magas pontszám a visszaútra
+        }
+        else {
+            // Nincs idõ visszamenni -> rossz megoldás
+            return -500;  // Erõs büntetés
+        }
     }
 
+    // Még vannak ásványok - keressük a legközelebbit
     int minDist = INT_MAX;
     for (const auto& m : allMinerals) {
         if (state.collected.find(m) == state.collected.end()) {
@@ -125,25 +162,43 @@ int heuristic(const RoverState& state, int maxTime, const Position& startPos) {
         }
     }
 
-    if (minDist > timeLeft) return 0;
-
-    int energyPenalty = 0;
-    if (!state.isDay && state.battery < minDist * 2) {
-        energyPenalty = 5;
+    // Sebesség bónusz - minél gyorsabban megyünk, annál jobb
+    int speedBonus = 0;
+    if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
+        string act = state.log.back().action;
+        int lastSpeed = stoi(act.substr(5));
+        speedBonus = lastSpeed * 2;  // Gyorsabb sebesség = nagyobb bónusz
     }
 
-    return remainingCount * 10 - minDist - energyPenalty;
+    // Energia állapot figyelembevétele
+    int energyBonus = 0;
+    if (state.battery > 70) energyBonus = 5;
+    else if (state.battery < 20) energyBonus = -10;
+
+    // Napszak bónusz - nappal jobb haladni
+    int dayBonus = state.isDay ? 3 : -3;
+
+    // Végeredmény: ásványok száma * 100 + távolság bónusz + sebesség bónusz
+    return remainingCount * 100 - minDist + speedBonus + energyBonus + dayBonus;
 }
 
+// Ellenõrzõ függvények
 bool isWalkable(int x, int y, const vector<vector<Cell>>& map) {
-    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
-    return !map[x][y].isObstacle;
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) {
+        return false;
+    }
+    if (map[x][y].isObstacle) {
+        return false;
+    }
+    return true;
 }
 
 bool isMineral(int x, int y, const vector<vector<Cell>>& map) {
+    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
     return map[x][y].mineral != MINERAL_NONE;
 }
 
+// Energia számítások
 int calculateMoveEnergy(int speed, bool isDay) {
     int energy = K * speed * speed;
     if (isDay) energy -= 10;
@@ -162,6 +217,7 @@ int calculateWaitEnergy(bool isDay) {
     return energy;
 }
 
+// Idõ frissítése
 void updateTime(RoverState& state) {
     state.timeElapsed++;
     state.dayTimeRemaining--;
@@ -172,6 +228,7 @@ void updateTime(RoverState& state) {
     }
 }
 
+// Térkép beolvasása - pontosan 50 sor
 bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startPos) {
     ifstream mapFile(filename);
     if (!mapFile.is_open()) {
@@ -180,48 +237,88 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
     }
 
     string line;
-    for (int i = 0; i < MAP_SIZE; i++) {
-        if (!getline(mapFile, line)) {
-            line = string(MAP_SIZE, '.');
-        }
+    int sor = 0;
 
-        for (int j = 0; j < MAP_SIZE; j++) {
-            char c = (j < line.length()) ? line[j] : '.';
+    // Pontosan 50 sort olvasunk be
+    while (getline(mapFile, line) && sor < MAP_SIZE) {
+        // Feldolgozzuk a sort - vesszõkkel elválasztva
+        stringstream ss(line);
+        string token;
+        int oszlop = 0;
+
+        while (getline(ss, token, ',') && oszlop < MAP_SIZE) {
+            // token lehet ".", "#", "B", "Y", "G", "S" stb.
+            // Lehet hogy van whitespace, ezért trimeljük
+            token.erase(0, token.find_first_not_of(" \t"));
+            token.erase(token.find_last_not_of(" \t") + 1);
+
+            if (token.empty()) {
+                // Üres token = '.' 
+                oszlop++;
+                continue;
+            }
+
+            char c = token[0];  // Az elsõ karakter a lényeges
 
             switch (c) {
             case '#':
-                map[i][j].isObstacle = true;
+                map[sor][oszlop].isObstacle = true;
                 break;
             case 'B':
-                map[i][j].mineral = MINERAL_BLUE;
+                map[sor][oszlop].mineral = MINERAL_BLUE;
                 break;
             case 'Y':
-                map[i][j].mineral = MINERAL_YELLOW;
+                map[sor][oszlop].mineral = MINERAL_YELLOW;
                 break;
             case 'G':
-                map[i][j].mineral = MINERAL_GREEN;
+                map[sor][oszlop].mineral = MINERAL_GREEN;
                 break;
             case 'S':
-                map[i][j].isStart = true;
-                startPos = Position(i, j);
+                map[sor][oszlop].isStart = true;
+                startPos = Position(sor, oszlop);
                 break;
             default:
+                // '.' vagy bármi más - üres
                 break;
             }
+            oszlop++;
         }
+
+        // Ha a sorban kevesebb volt mint MAP_SIZE, a maradék marad '.' (alapértelmezett)
+        sor++;
     }
 
     mapFile.close();
 
+    // Összes ásvány gyûjtése
     allMinerals = getAllMinerals(map);
     cout << "Total minerals on map: " << allMinerals.size() << endl;
+
+    // Térkép ellenõrzése - kiírjuk az elsõ 5 sort
+    cout << "\nTerkep ellenorzes (elso 5 sor):" << endl;
+    for (int i = 0; i < 5 && i < MAP_SIZE; i++) {
+        for (int j = 0; j < 30 && j < MAP_SIZE; j++) {
+            if (map[i][j].isObstacle) cout << "#";
+            else if (map[i][j].mineral != MINERAL_NONE) {
+                if (map[i][j].mineral == MINERAL_BLUE) cout << "B";
+                else if (map[i][j].mineral == MINERAL_YELLOW) cout << "Y";
+                else if (map[i][j].mineral == MINERAL_GREEN) cout << "G";
+            }
+            else if (map[i][j].isStart) cout << "S";
+            else cout << ".";
+        }
+        cout << "  <- " << i << ". sor" << endl;
+    }
+    cout << endl;
 
     return true;
 }
 
-const int dx[] = { 0, 1, 0, -1, 1, 1, -1, -1 };
-const int dy[] = { 1, 0, -1, 0, 1, -1, 1, -1 };
+// Mozgási irányok (8 irány)
+const int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
+const int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
+// A* keresés - minden sebességgel
 pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>& map, const Position& startPos) {
     auto startTime = chrono::steady_clock::now();
 
@@ -239,17 +336,18 @@ pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>&
 
     int maxMinerals = 0;
     RoverState bestState;
+    int bestTimeAtStart = INT_MAX;
 
     int iterations = 0;
-    const int MAX_ITERATIONS = 2000000;
+    const int MAX_ITERATIONS = 5000000;  // 5 millió iteráció
 
     while (!openSet.empty() && iterations < MAX_ITERATIONS) {
         iterations++;
 
         auto currentTime = chrono::steady_clock::now();
         auto elapsed = chrono::duration_cast<chrono::seconds>(currentTime - startTime).count();
-        if (elapsed > 15) {
-            cout << "Search timeout after 15 seconds, stopping..." << endl;
+        if (elapsed > 120) {
+            cout << "Search timeout after 60 seconds, stopping..." << endl;
             break;
         }
 
@@ -261,12 +359,21 @@ pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>&
             continue;
         }
 
-        if (current.state.totalMinerals > maxMinerals) {
-            maxMinerals = current.state.totalMinerals;
-            bestState = current.state;
-            cout << "Found better solution: " << maxMinerals << " minerals at time "
-                << current.state.getTimeString() << " (pos: " << current.state.pos.x
-                << "," << current.state.pos.y << ")" << endl;
+        if (current.state.pos == startPos) {
+            if (current.state.totalMinerals > maxMinerals) {
+                maxMinerals = current.state.totalMinerals;
+                bestState = current.state;
+                bestTimeAtStart = current.state.timeElapsed;
+                cout << "Found solution: " << maxMinerals << " minerals, returned to start at time "
+                    << current.state.getTimeString() << endl;
+            }
+            else if (current.state.totalMinerals == maxMinerals &&
+                current.state.timeElapsed < bestTimeAtStart) {
+                bestState = current.state;
+                bestTimeAtStart = current.state.timeElapsed;
+                cout << "Better time for " << maxMinerals << " minerals: "
+                    << current.state.getTimeString() << endl;
+            }
         }
 
         if (current.state.totalMinerals == allMinerals.size() && current.state.pos == startPos) {
@@ -346,7 +453,7 @@ pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>&
             }
         }
 
-        {
+        if (!current.state.isDay && current.state.battery < 30) {
             RoverState newState = current.state;
 
             int energyChange = calculateWaitEnergy(current.state.isDay);
@@ -355,22 +462,17 @@ pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>&
 
             updateTime(newState);
 
-            bool shouldWait = (newState.battery > 0) ||
-                (current.state.isDay == false && current.state.battery < 20);
+            newState.addLogEntry(0, "WAIT");
+            newState.path.push_back(newState.pos);
 
-            if (shouldWait) {
-                newState.addLogEntry(0, "WAIT");
-                newState.path.push_back(newState.pos);
+            string newStateId = newState.getStateId();
+            int newG = newState.timeElapsed;
 
-                string newStateId = newState.getStateId();
-                int newG = newState.timeElapsed;
-
-                if (bestG.find(newStateId) == bestG.end() || newG < bestG[newStateId]) {
-                    bestG[newStateId] = newG;
-                    int h = heuristic(newState, maxTime, startPos);
-                    openSet.push(AStarNode(newState, newG, h,
-                        make_shared<AStarNode>(current), "WAIT"));
-                }
+            if (bestG.find(newStateId) == bestG.end() || newG < bestG[newStateId]) {
+                bestG[newStateId] = newG;
+                int h = heuristic(newState, maxTime, startPos);
+                openSet.push(AStarNode(newState, newG, h,
+                    make_shared<AStarNode>(current), "WAIT"));
             }
         }
     }

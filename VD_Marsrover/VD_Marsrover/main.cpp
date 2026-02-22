@@ -6,7 +6,7 @@
 
 using namespace std;
 
-#define MAX_HOURS_TSET 24
+#define MAX_HOURS_TSET 100
 
 int main(int argc, char* argv[]) {
     string mapFile = R"(C:\Users\Sanyi\Desktop\verseny\VD_Marsrover\VD_Marsrover\asd.txt)";
