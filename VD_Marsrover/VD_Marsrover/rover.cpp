@@ -84,11 +84,8 @@ AStarNode::AStarNode(const RoverState& s, int gCost, int hCost,
 }
 
 bool AStarNode::operator>(const AStarNode& other) const {
-    // 1. Több ásvány mindenképp jobb
     if (state.totalMinerals != other.state.totalMinerals)
         return state.totalMinerals < other.state.totalMinerals;
-
-    // 2. Ha ugyanannyi ásvány, akkor a nagyobb sebesség jobb (gyorsabban halad)
     int lastSpeedThis = 0, lastSpeedOther = 0;
     if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
         string act = state.log.back().action;
@@ -101,14 +98,12 @@ bool AStarNode::operator>(const AStarNode& other) const {
     if (lastSpeedThis != lastSpeedOther)
         return lastSpeedThis < lastSpeedOther;
 
-    // 3. Ha ugyanolyan sebesség, akkor a kevesebb idõ jobb
     if (state.timeElapsed != other.state.timeElapsed)
         return state.timeElapsed > other.state.timeElapsed;
 
     return false;
 }
 
-// Távolság számítások
 int manhattanDistance(const Position& a, const Position& b) {
     return abs(a.x - b.x) + abs(a.y - b.y);
 }
@@ -117,7 +112,6 @@ int chebyshevDistance(const Position& a, const Position& b) {
     return max(abs(a.x - b.x), abs(a.y - b.y));
 }
 
-// Összes ásvány pozíciójának lekérése
 vector<Position> getAllMinerals(const vector<vector<Cell>>& map) {
     vector<Position> minerals;
     for (int i = 0; i < MAP_SIZE; i++) {
@@ -130,30 +124,25 @@ vector<Position> getAllMinerals(const vector<vector<Cell>>& map) {
     return minerals;
 }
 
-// Globális ásvány lista
 vector<Position> allMinerals;
 
-// Heurisztika - sebesség súlyozással
 int heuristic(const RoverState& state, int maxTime, const Position& startPos) {
     int timeLeft = maxTime - state.timeElapsed;
-    if (timeLeft <= 0) return -1000;  // Ha elfogyott az idõ, nagyon rossz
+    if (timeLeft <= 0) return -1000;
 
     int remainingCount = allMinerals.size() - state.totalMinerals;
 
-    // Ha nincs több ásvány, vissza kell menni a startba
     if (remainingCount == 0) {
         int distToStart = chebyshevDistance(state.pos, startPos);
         if (distToStart <= timeLeft) {
-            // Van idõ visszamenni -> ez jó megoldás
-            return 100;  // Magas pontszám a visszaútra
+
+            return 100;
         }
         else {
-            // Nincs idõ visszamenni -> rossz megoldás
-            return -500;  // Erõs büntetés
+            return -500;
         }
     }
 
-    // Még vannak ásványok - keressük a legközelebbit
     int minDist = INT_MAX;
     for (const auto& m : allMinerals) {
         if (state.collected.find(m) == state.collected.end()) {
@@ -162,27 +151,22 @@ int heuristic(const RoverState& state, int maxTime, const Position& startPos) {
         }
     }
 
-    // Sebesség bónusz - minél gyorsabban megyünk, annál jobb
     int speedBonus = 0;
     if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
         string act = state.log.back().action;
         int lastSpeed = stoi(act.substr(5));
-        speedBonus = lastSpeed * 2;  // Gyorsabb sebesség = nagyobb bónusz
+        speedBonus = lastSpeed * 2;
     }
 
-    // Energia állapot figyelembevétele
     int energyBonus = 0;
     if (state.battery > 70) energyBonus = 5;
     else if (state.battery < 20) energyBonus = -10;
 
-    // Napszak bónusz - nappal jobb haladni
     int dayBonus = state.isDay ? 3 : -3;
 
-    // Végeredmény: ásványok száma * 100 + távolság bónusz + sebesség bónusz
     return remainingCount * 100 - minDist + speedBonus + energyBonus + dayBonus;
 }
 
-// Ellenõrzõ függvények
 bool isWalkable(int x, int y, const vector<vector<Cell>>& map) {
     if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) {
         return false;
@@ -198,7 +182,6 @@ bool isMineral(int x, int y, const vector<vector<Cell>>& map) {
     return map[x][y].mineral != MINERAL_NONE;
 }
 
-// Energia számítások
 int calculateMoveEnergy(int speed, bool isDay) {
     int energy = K * speed * speed;
     if (isDay) energy -= 10;
@@ -217,7 +200,6 @@ int calculateWaitEnergy(bool isDay) {
     return energy;
 }
 
-// Idõ frissítése
 void updateTime(RoverState& state) {
     state.timeElapsed++;
     state.dayTimeRemaining--;
@@ -228,7 +210,6 @@ void updateTime(RoverState& state) {
     }
 }
 
-// Térkép beolvasása - pontosan 50 sor
 bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startPos) {
     ifstream mapFile(filename);
     if (!mapFile.is_open()) {
@@ -239,16 +220,12 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
     string line;
     int sor = 0;
 
-    // Pontosan 50 sort olvasunk be
     while (getline(mapFile, line) && sor < MAP_SIZE) {
-        // Feldolgozzuk a sort - vesszõkkel elválasztva
         stringstream ss(line);
         string token;
         int oszlop = 0;
 
         while (getline(ss, token, ',') && oszlop < MAP_SIZE) {
-            // token lehet ".", "#", "B", "Y", "G", "S" stb.
-            // Lehet hogy van whitespace, ezért trimeljük
             token.erase(0, token.find_first_not_of(" \t"));
             token.erase(token.find_last_not_of(" \t") + 1);
 
@@ -258,7 +235,7 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
                 continue;
             }
 
-            char c = token[0];  // Az elsõ karakter a lényeges
+            char c = token[0];
 
             switch (c) {
             case '#':
@@ -278,23 +255,18 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
                 startPos = Position(sor, oszlop);
                 break;
             default:
-                // '.' vagy bármi más - üres
                 break;
             }
             oszlop++;
         }
-
-        // Ha a sorban kevesebb volt mint MAP_SIZE, a maradék marad '.' (alapértelmezett)
         sor++;
     }
 
     mapFile.close();
 
-    // Összes ásvány gyûjtése
     allMinerals = getAllMinerals(map);
     cout << "Total minerals on map: " << allMinerals.size() << endl;
 
-    // Térkép ellenõrzése - kiírjuk az elsõ 5 sort
     cout << "\nTerkep ellenorzes (elso 5 sor):" << endl;
     for (int i = 0; i < 5 && i < MAP_SIZE; i++) {
         for (int j = 0; j < 30 && j < MAP_SIZE; j++) {
@@ -314,11 +286,9 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
     return true;
 }
 
-// Mozgási irányok (8 irány)
 const int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
 const int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
 
-// A* keresés - minden sebességgel
 pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>& map, const Position& startPos) {
     auto startTime = chrono::steady_clock::now();
 
@@ -339,7 +309,7 @@ pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>&
     int bestTimeAtStart = INT_MAX;
 
     int iterations = 0;
-    const int MAX_ITERATIONS = 5000000;  // 5 millió iteráció
+    const int MAX_ITERATIONS = 5000000;
 
     while (!openSet.empty() && iterations < MAX_ITERATIONS) {
         iterations++;
