@@ -13,3 +13,5 @@ struct u_matrix {
 };
 
 Image load_img_for_icon();
+
+void CoreLoop();
