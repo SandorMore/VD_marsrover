@@ -32,40 +32,62 @@ int main(int argc, char* argv[]) {
     }
     return 0;*/
 }
+const float CELL_SIZE = 1.0f;
 
-
-void CoreLoop(const char* title) {
-    
+void CoreLoop(const char* title)
+{
     InitWindow(WIDTH, HEIGHT, title);
-    
-    unsigned ch_to_draw = 10;
-    
-    Vector3 position{1, 1, 1};
-
-
-    Camera3D camera = { };
+    DisableCursor();
+    // Camera setup
+    Camera3D camera = { 0 };
     camera.position = { 5.0f, 5.0f, 5.0f };
-    camera.target = position;
+    camera.target = { 0.0f, 0.0f, 0.0f };
     camera.up = { 0.0f, 1.0f, 0.0f };
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
 
     Model model = LoadModel("model4.glb");
-    
-    while (!WindowShouldClose()) {
-        UpdateCamera(&camera, CAMERA_ORBITAL);
+
+    bool free_mode = false;
+
+    SetTargetFPS(60);
+
+    while (!WindowShouldClose())
+    {
+        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_S) || IsKeyDown(KEY_A) || IsKeyDown(KEY_D))
+            free_mode = true;
+
+        if (free_mode)
+            UpdateCamera(&camera, CAMERA_FREE);
+        else
+            UpdateCamera(&camera, CAMERA_ORBITAL);
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
         BeginMode3D(camera);
+        
 
-        DrawModel(model, { 0.0f, 0.0f, 0.0f }, .89f, WHITE);
-        DrawGrid(MAP_SIZE, 4.0f);
+        DrawModel(model, { 0.0f, 0.0f, 0.0f }, 0.1f, WHITE);
+
+        for (int i = -MAP_SIZE / 2; i < MAP_SIZE / 2; i++)
+        {
+            for (int j = -MAP_SIZE / 2; j < MAP_SIZE / 2; j++)
+            {
+                Color cellColor = ((i + j) % 2 == 0) ? LIGHTGRAY : GRAY;
+
+                DrawCube({ i * CELL_SIZE, -0.05f, j * CELL_SIZE }, CELL_SIZE, 0.1f, CELL_SIZE, cellColor);
+
+                DrawCubeWires({ i * CELL_SIZE, -0.05f, j * CELL_SIZE }, CELL_SIZE, 0.1f, CELL_SIZE, BLACK);
+            }
+        }
 
         EndMode3D();
+
+        DrawText("Colored Grid Ground Example", 10, 10, 20, DARKGRAY);
         EndDrawing();
     }
+
     UnloadModel(model);
     CloseWindow();
 }
