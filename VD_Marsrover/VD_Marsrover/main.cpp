@@ -43,9 +43,9 @@ void CoreLoop(const char* title) {
     Vector3 position{1, 1, 1};
 
 
-    Camera3D camera = { 0 };
+    Camera3D camera = { };
     camera.position = { 5.0f, 5.0f, 5.0f };
-    camera.target = { 0.0f, 1.0f, 0.0f };
+    camera.target = position;
     camera.up = { 0.0f, 1.0f, 0.0f };
     camera.fovy = 45.0f;
     camera.projection = CAMERA_PERSPECTIVE;
@@ -60,8 +60,8 @@ void CoreLoop(const char* title) {
 
         BeginMode3D(camera);
 
-        DrawModel(model, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
-        DrawGrid(20, 1.0f);
+        DrawModel(model, { 0.0f, 0.0f, 0.0f }, .89f, WHITE);
+        DrawGrid(MAP_SIZE, 4.0f);
 
         EndMode3D();
         EndDrawing();
