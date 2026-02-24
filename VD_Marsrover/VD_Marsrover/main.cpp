@@ -18,25 +18,32 @@ using namespace std;
 
 #define MAX_HOURS_TSET 100
 
-void CoreLoop(const char* title);
+void main_loop(const char* title);
 
 int main(int argc, char* argv[]) {
     string map_file = R"(C:\Users\Sanyi\Desktop\verseny\VD_Marsrover\VD_Marsrover\asd.txt)";
     int max_hours = MAX_HOURS_TSET; //atoi(argv[2])
     int max_half_hours = max_hours * 2;
 
-    std::thread t();
-    CoreLoop("Marsrover");
+    std::vector<std::vector<Cell>>map;
 
+    Position start_position;
 
-    /*if (t.joinable()) {
+    std::thread t(main_loop, "VD_Marsrover");
+    std::thread k(readMap, std::ref(map_file), std::ref(map), std::ref(start_position));
+
+    if (k.joinable()) {
+        k.join();
+    }
+
+    if (t.joinable()) {
         t.join();
     }
-    return 0;*/
+    return 0;
 }
 const float CELL_SIZE = 1.0f;
 
-void CoreLoop(const char* title)
+void main_loop(const char* title)
 {
     InitWindow(WIDTH, HEIGHT, title);
     DisableCursor();
