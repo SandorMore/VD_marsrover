@@ -230,7 +230,6 @@ bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startP
             token.erase(token.find_last_not_of(" \t") + 1);
 
             if (token.empty()) {
-                // Üres token = '.' 
                 oszlop++;
                 continue;
             }
