@@ -90,9 +90,7 @@ struct RoverState
 
     bool isDay;
 
-    std::unordered_set<
-        Position,
-        PositionHash> collected;
+    std::unordered_set<Position, PositionHash> collected;
 
     int totalMinerals;
 
@@ -106,9 +104,7 @@ struct RoverState
 
     std::string getTimeString() const;
 
-    void addLogEntry(
-        int speed,
-        const std::string& action);
+    void addLogEntry(int speed, const std::string& action);
 
     std::string getStateId() const;
 };
@@ -125,61 +121,31 @@ struct AStarNode
 
     std::string action;
 
-    AStarNode(
-        const RoverState& s,
-        int gCost,
-        int hCost,
-        std::shared_ptr<AStarNode> p = nullptr,
-        const std::string& a = "");
+    AStarNode(const RoverState& s, int gCost, int hCost, std::shared_ptr<AStarNode> p = nullptr, const std::string& a = "");
 
-    bool operator>(
-        const AStarNode& other) const;
+    bool operator>(const AStarNode& other) const;
 };
 
-int chebyshevDistance(
-    const Position& a,
-    const Position& b);
+int chebyshevDistance(const Position& a, const Position& b);
 
-int heuristic(
-    const RoverState& state,
-    int maxTime,
-    const Position& startPos);
+int heuristic(const RoverState& state, int maxTime, const Position& startPos);
 
-bool isWalkable(
-    int x,
-    int y,
-    const std::vector<std::vector<Cell>>& map);
+bool isWalkable(int x, int y, const std::vector<std::vector<Cell>>& map);
 
-bool isMineral(
-    int x,
-    int y,
-    const std::vector<std::vector<Cell>>& map);
+bool isMineral(int x, int y, const std::vector<std::vector<Cell>>& map);
 
-int calculateMoveEnergy(
-    int speed,
-    bool isDay);
+int calculateMoveEnergy(int speed, bool isDay);
 
-int calculateMineEnergy(
-    bool isDay);
+int calculateMineEnergy(bool isDay);
 
-int calculateWaitEnergy(
-    bool isDay);
+int calculateWaitEnergy(bool isDay);
 
-void updateTime(
-    RoverState& state);
+void updateTime(RoverState& state);
 
-bool readMap(
-    const std::string& filename,
-    std::vector<std::vector<Cell>>& map,
-    Position& startPos);
+bool readMap(const std::string& filename, std::vector<std::vector<Cell>>& map, Position& startPos);
 
-std::pair<
-    std::vector<LogEntry>,
-    int>
-    aStarSearch(
-        int maxTime,
-        const std::vector<std::vector<Cell>>& map,
-        const Position& startPos);
+std::pair<std::vector<LogEntry>, int>
+    aStarSearch(int maxTime, const std::vector<std::vector<Cell>>& map, const Position& startPos);
 
 void saveLogToFile(const std::vector<LogEntry>& log, const std::string& filename);
 

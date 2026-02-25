@@ -12,20 +12,15 @@ int main()
 
     int max_half_hours = 200;
 
-    std::vector<std::vector<Cell>> map(
-        MAP_SIZE,
-        std::vector<Cell>(MAP_SIZE)
-    );
+    std::vector<std::vector<Cell>> map(MAP_SIZE, std::vector<Cell>(MAP_SIZE));
 
     Position start_position;
-
 
     if (!readMap(map_file, map, start_position))
     {
         std::cout << "Map load failed\n";
         return 1;
     }
-
 
     auto route = buildFastRoute(map, start_position);
 

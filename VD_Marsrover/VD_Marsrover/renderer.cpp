@@ -8,7 +8,7 @@
 #define WIDTH 1200
 #define HEIGHT 800
 #define TARGET_FPS 60
-#define MOVE_DELAY 30
+#define MOVE_DELAY 20
 
 void drawMap(const std::vector<std::vector<Cell>>& map)
 {
@@ -34,12 +34,7 @@ void drawMap(const std::vector<std::vector<Cell>>& map)
     }
 }
 
-void main_loop(
-    const char* title,
-    const std::vector<std::vector<Cell>>& map,
-    const Position& startPos,
-    const std::vector<Position>& route
-)
+void main_loop(const char* title, const std::vector<std::vector<Cell>>& map, const Position& startPos, const std::vector<Position>& route)
 {
     InitWindow(WIDTH, HEIGHT, title);
 
@@ -86,7 +81,7 @@ void main_loop(
         float angle = GetTime() * 0.5f;
         camera.position.x = camera.target.x + radius * cosf(angle);
         camera.position.z = camera.target.z + radius * sinf(angle);
-        camera.position.y = camera.target.y + 3.f;
+        camera.position.y = camera.target.y + 8.f;
 
         UpdateCamera(&camera, CAMERA_ORBITAL);
 

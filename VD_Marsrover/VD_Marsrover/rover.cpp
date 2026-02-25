@@ -9,24 +9,12 @@ string LogEntry::toString() const
 {
     stringstream ss;
 
-    ss << timeStep << ","
-        << x << ","
-        << y << ","
-        << battery << ","
-        << speed << ","
-        << distance << ","
-        << mineralsCollected << ","
-        << action << ","
-        << (isDay ? "DAY" : "NIGHT") << ","
-        << timestamp;
+    ss << timeStep << "," << x << "," << y << "," << battery << "," << speed << "," << distance << "," << mineralsCollected << "," << action << "," << (isDay ? "DAY" : "NIGHT") << "," << timestamp;
 
     return ss.str();
 }
 
-Position::Position(int x, int y)
-    : x(x), y(y)
-{
-}
+Position::Position(int x, int y) : x(x), y(y){}
 
 bool Position::operator==(const Position& other) const
 {
@@ -38,22 +26,9 @@ size_t PositionHash::operator()(const Position& p) const
     return p.x * 53 + p.y;
 }
 
-Cell::Cell()
-    : mineral(MINERAL_NONE),
-    isObstacle(false),
-    isStart(false)
-{
-}
+Cell::Cell() : mineral(MINERAL_NONE), isObstacle(false), isStart(false){}
 
-RoverState::RoverState()
-    : battery(MAX_BATTERY),
-    isDay(true),
-    dayTimeRemaining(DAY_DURATION),
-    totalMinerals(0),
-    timeElapsed(0),
-    totalDistance(0)
-{
-}
+RoverState::RoverState() : battery(MAX_BATTERY), isDay(true), dayTimeRemaining(DAY_DURATION), totalMinerals(0), timeElapsed(0), totalDistance(0){}
 
 string RoverState::getTimeString() const
 {
@@ -91,11 +66,7 @@ string RoverState::getStateId() const
 {
     stringstream ss;
 
-    ss << pos.x << ","
-        << pos.y << ","
-        << battery << ","
-        << isDay << ","
-        << dayTimeRemaining << ",";
+    ss << pos.x << "," << pos.y << "," << battery << "," << isDay << "," << dayTimeRemaining << ",";
 
     for (const auto& p : collected)
     {
@@ -105,20 +76,7 @@ string RoverState::getStateId() const
     return ss.str();
 }
 
-AStarNode::AStarNode(
-    const RoverState& s,
-    int gCost,
-    int hCost,
-    shared_ptr<AStarNode> p,
-    const string& a)
-    : state(s),
-    g(gCost),
-    h(hCost),
-    f(gCost + hCost),
-    parent(p),
-    action(a)
-{
-}
+AStarNode::AStarNode(const RoverState& s, int gCost, int hCost, shared_ptr<AStarNode> p, const string& a) : state(s), g(gCost), h(hCost), f(gCost + hCost), parent(p), action(a){}
 
 
 bool AStarNode::operator>(const AStarNode& other) const
@@ -150,10 +108,7 @@ vector<Position> getAllMinerals(const vector<vector<Cell>>& map)
     return v;
 }
 
-int heuristic(
-    const RoverState& s,
-    int maxTime,
-    const Position& start)
+int heuristic(const RoverState& s, int maxTime, const Position& start)
 {
     int timeLeft = maxTime - s.timeElapsed;
 
@@ -222,16 +177,11 @@ void updateTime(RoverState& s)
     {
         s.isDay = !s.isDay;
 
-        s.dayTimeRemaining =
-            s.isDay ? DAY_DURATION
-            : NIGHT_DURATION;
+        s.dayTimeRemaining = s.isDay ? DAY_DURATION : NIGHT_DURATION;
     }
 }
 
-bool readMap(
-    const string& filename,
-    vector<vector<Cell>>& map,
-    Position& startPos)
+bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startPos)
 {
     ifstream f(filename);
 
@@ -278,30 +228,19 @@ bool readMap(
 
     allMinerals = getAllMinerals(map);
 
-    cout << "Minerals: "
-        << allMinerals.size()
-        << endl;
+    cout << "Minerals: " << allMinerals.size() << endl;
 
     return true;
 }
 
-bool isWalkable(
-    int x,
-    int y,
-    const vector<vector<Cell>>& map)
+bool isWalkable(int x, int y, const vector<vector<Cell>>& map)
 {
-    if (x < 0 || y < 0 ||
-        x >= MAP_SIZE ||
-        y >= MAP_SIZE)
-        return false;
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
 
     return !map[x][y].isObstacle;
 }
 
-bool isMineral(
-    int x,
-    int y,
-    const vector<vector<Cell>>& map)
+bool isMineral(int x, int y, const vector<vector<Cell>>& map)
 {
     return map[x][y].mineral != MINERAL_NONE;
 }
@@ -318,10 +257,7 @@ aStarSearch(
 {
     auto t0 = chrono::steady_clock::now();
 
-    priority_queue<
-        AStarNode,
-        vector<AStarNode>,
-        greater<AStarNode>> open;
+    priority_queue<AStarNode, vector<AStarNode>, greater<AStarNode>> open;
 
     unordered_map<string, int> bestG;
 
@@ -357,9 +293,7 @@ aStarSearch(
                 bestMinerals = cur.state.totalMinerals;
                 bestState = cur.state;
 
-                cout << "BEST = "
-                    << bestMinerals
-                    << endl;
+                cout << "BEST = " << bestMinerals << endl;
             }
         }
         for (int i = 0; i < 8; i++)
@@ -379,14 +313,9 @@ aStarSearch(
 
                 int e = calculateMoveEnergy(speed, ns.isDay);
 
-                ns.battery = max(
-                    0,
-                    min(MAX_BATTERY,
-                        ns.battery - e));
+                ns.battery = max(0, min(MAX_BATTERY, ns.battery - e));
 
-                if (ns.battery <= 0 &&
-                    !ns.isDay)
-                    continue;
+                if (ns.battery <= 0 && !ns.isDay) continue;
 
                 updateTime(ns);
 
@@ -395,29 +324,17 @@ aStarSearch(
                 string id = ns.getStateId();
                 int g = ns.timeElapsed;
 
-                if (bestG.find(id) == bestG.end()
-                    || g < bestG[id])
+                if (bestG.find(id) == bestG.end() || g < bestG[id])
                 {
                     bestG[id] = g;
 
-                    int h =
-                        heuristic(
-                            ns,
-                            maxTime,
-                            startPos);
+                    int h = heuristic(ns, maxTime, startPos);
 
-                    open.push(
-                        AStarNode(ns, g, h));
+                    open.push(AStarNode(ns, g, h));
                 }
             }
         }
-        if (isMineral(
-            cur.state.pos.x,
-            cur.state.pos.y,
-            map) &&
-            cur.state.collected.find(
-                cur.state.pos)
-            == cur.state.collected.end())
+        if (isMineral(cur.state.pos.x, cur.state.pos.y,map) && cur.state.collected.find(cur.state.pos) == cur.state.collected.end())
         {
             RoverState ns = cur.state;
 
@@ -431,40 +348,26 @@ aStarSearch(
             string id = ns.getStateId();
             int g = ns.timeElapsed;
 
-            if (bestG.find(id) == bestG.end()
-                || g < bestG[id])
+            if (bestG.find(id) == bestG.end() || g < bestG[id])
             {
                 bestG[id] = g;
+                int h = heuristic(ns, maxTime, startPos);
 
-                int h =
-                    heuristic(
-                        ns,
-                        maxTime,
-                        startPos);
-
-                open.push(
-                    AStarNode(ns, g, h));
+                open.push(AStarNode(ns, g, h));
             }
         }
     }
 
-    cout << "Iterations = "
-        << iterations
-        << endl;
+    cout << "Iterations = " << iterations << endl;
 
-    return make_pair(
-        bestState.log,
-        bestMinerals);
+    return make_pair(bestState.log, bestMinerals);
 }
 
-void saveLogToFile(
-    const vector<LogEntry>& log,
-    const string& filename)
+void saveLogToFile(const vector<LogEntry>& log, const string& filename)
 {
     ofstream f(filename);
 
-    f << "TimeStep,X,Y,Battery,Speed,Distance,"
-        "Minerals,Action,TimeOfDay,Timestamp\n";
+    f << "TimeStep,X,Y,Battery,Speed,Distance," "Minerals,Action,TimeOfDay,Timestamp\n";
 
     for (const auto& e : log)
         f << e.toString() << "\n";

@@ -36,6 +36,9 @@
     <ClCompile Include="fast_f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="dn_cycle.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
@@ -51,6 +54,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dn_cycle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

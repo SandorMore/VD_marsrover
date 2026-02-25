@@ -5,8 +5,6 @@
 #include <vector>
 #include <algorithm>
 
-
-
 struct PathNode
 {
     Position pos;
@@ -15,35 +13,16 @@ struct PathNode
     int f;
 };
 
-
-
 int simpleHeuristic(const Position& a, const Position& b)
 {
-    return std::max(
-        abs(a.x - b.x),
-        abs(a.y - b.y)
-    );
+    return std::max(abs(a.x - b.x), abs(a.y - b.y));
 }
 
-
-
-bool findPathToTarget(
-    const Position& start,
-    const Position& target,
-    const std::vector<std::vector<Cell>>& map,
-    std::vector<Position>& outPath
-)
+bool findPathToTarget(const Position& start, const Position& target, const std::vector<std::vector<Cell>>& map, std::vector<Position>& outPath)
 {
-    auto cmp = [](const std::pair<int, Position>& a,
-        const std::pair<int, Position>& b) {
-            return a.first > b.first; 
-        };
+    auto cmp = [](const std::pair<int, Position>& a, const std::pair<int, Position>& b) {return a.first > b.first;};
 
-    std::priority_queue<
-        std::pair<int, Position>,
-        std::vector<std::pair<int, Position>>,
-        decltype(cmp)
-    > open(cmp);
+    std::priority_queue< std::pair<int, Position>, std::vector<std::pair<int, Position>>, decltype(cmp) > open(cmp);
 
     std::unordered_map<Position, Position, PositionHash> parent;
 
@@ -117,10 +96,7 @@ bool findPathToTarget(
 
 
 
-Position findNearestMineral(
-    const Position& rover,
-    const std::vector<std::vector<Cell>>& map
-)
+Position findNearestMineral(const Position& rover, const std::vector<std::vector<Cell>>& map)
 {
     int bestDist = INT_MAX;
 
@@ -149,10 +125,7 @@ Position findNearestMineral(
 
 
 
-std::vector<Position> buildFastRoute(
-    std::vector<std::vector<Cell>> map,
-    Position start
-)
+std::vector<Position> buildFastRoute(std::vector<std::vector<Cell>> map, Position start)
 {
     std::vector<Position> route;
 
@@ -160,8 +133,7 @@ std::vector<Position> buildFastRoute(
 
     while (true)
     {
-        Position target =
-            findNearestMineral(rover, map);
+        Position target = findNearestMineral(rover, map);
 
         if (target == rover)
             break;
@@ -182,8 +154,7 @@ std::vector<Position> buildFastRoute(
         }
 
 
-        map[target.x][target.y].mineral =
-            MINERAL_NONE;
+        map[target.x][target.y].mineral = MINERAL_NONE;
 
         rover = target;
     }
