@@ -127,11 +127,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="file_handler.cpp" />
+    <ClCompile Include="heightmap.cpp" />
     <ClCompile Include="img_stuff.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="mesh_collisions.cpp" />
     <ClCompile Include="rover.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="heightmap.h" />
+    <ClInclude Include="mesh_collisions.h" />
     <ClInclude Include="misc.h" />
     <ClInclude Include="rover.h" />
     <ClInclude Include="stb_image.h" />
