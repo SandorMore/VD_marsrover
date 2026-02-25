@@ -4,11 +4,11 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <thread>
 
 int main()
 {
-    std::string map_file =
-        R"(asd.txt)";
+    std::string map_file = "asd.txt";
 
     int max_half_hours = 200;
 
@@ -19,7 +19,6 @@ int main()
 
     Position start_position;
 
-    readMap(map_file, map, start_position);
 
     if (!readMap(map_file, map, start_position))
     {
@@ -27,10 +26,10 @@ int main()
         return 1;
     }
 
-    auto result =
-        aStarSearch(max_half_hours, map, start_position);
 
-    main_loop("VD_Marsrover", map, start_position);
+    auto route = buildFastRoute(map, start_position);
+
+    main_loop("VD_Marsrover", map, start_position, route);
 
     return 0;
 }

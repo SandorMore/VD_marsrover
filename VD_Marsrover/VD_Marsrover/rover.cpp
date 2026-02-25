@@ -3,474 +3,469 @@
 
 using namespace std;
 
-// LogEntry metódusok
-string LogEntry::toString() const {
+vector<Position> allMinerals;
+
+string LogEntry::toString() const
+{
     stringstream ss;
-    ss << timeStep << "," << x << "," << y << "," << battery << ","
-        << speed << "," << distance << "," << mineralsCollected << ","
-        << action << "," << (isDay ? "DAY" : "NIGHT") << "," << timestamp;
+
+    ss << timeStep << ","
+        << x << ","
+        << y << ","
+        << battery << ","
+        << speed << ","
+        << distance << ","
+        << mineralsCollected << ","
+        << action << ","
+        << (isDay ? "DAY" : "NIGHT") << ","
+        << timestamp;
+
     return ss.str();
 }
 
-// Position metódusok
-Position::Position(int x, int y) : x(x), y(y) {}
+Position::Position(int x, int y)
+    : x(x), y(y)
+{
+}
 
-bool Position::operator==(const Position& other) const {
+bool Position::operator==(const Position& other) const
+{
     return x == other.x && y == other.y;
 }
 
-// PositionHash metódus
-size_t PositionHash::operator()(const Position& p) const {
+size_t PositionHash::operator()(const Position& p) const
+{
     return p.x * 53 + p.y;
 }
 
-// Cell metódusok
-Cell::Cell() : mineral(MINERAL_NONE), isObstacle(false), isStart(false) {}
-
-// RoverState metódusok
-RoverState::RoverState() : battery(MAX_BATTERY), isDay(true),
-dayTimeRemaining(DAY_DURATION), totalMinerals(0),
-timeElapsed(0), totalDistance(0) {
+Cell::Cell()
+    : mineral(MINERAL_NONE),
+    isObstacle(false),
+    isStart(false)
+{
 }
 
-RoverState::RoverState(const RoverState& other) {
-    pos = other.pos;
-    battery = other.battery;
-    dayTimeRemaining = other.dayTimeRemaining;
-    isDay = other.isDay;
-    collected = other.collected;
-    totalMinerals = other.totalMinerals;
-    timeElapsed = other.timeElapsed;
-    totalDistance = other.totalDistance;
-    log = other.log;
-    path = other.path;
+RoverState::RoverState()
+    : battery(MAX_BATTERY),
+    isDay(true),
+    dayTimeRemaining(DAY_DURATION),
+    totalMinerals(0),
+    timeElapsed(0),
+    totalDistance(0)
+{
 }
 
-string RoverState::getTimeString() const {
-    int totalHalfHours = timeElapsed;
-    int hours = totalHalfHours / 2;
-    int halfHours = totalHalfHours % 2;
+string RoverState::getTimeString() const
+{
+    int hours = timeElapsed / 2;
+    int half = timeElapsed % 2;
+
     stringstream ss;
-    ss << setw(2) << setfill('0') << hours << ":"
-        << (halfHours == 0 ? "00" : "30");
+
+    ss << setw(2) << setfill('0') << hours
+        << ":" << (half ? "30" : "00");
+
     return ss.str();
 }
 
-void RoverState::addLogEntry(int speed, const string& action) {
-    LogEntry entry;
-    entry.timeStep = timeElapsed;
-    entry.x = pos.x;
-    entry.y = pos.y;
-    entry.battery = battery;
-    entry.speed = speed;
-    entry.distance = totalDistance;
-    entry.mineralsCollected = totalMinerals;
-    entry.action = action;
-    entry.isDay = isDay;
-    entry.timestamp = getTimeString();
-    log.push_back(entry);
+void RoverState::addLogEntry(int speed, const string& action)
+{
+    LogEntry e;
+
+    e.timeStep = timeElapsed;
+    e.x = pos.x;
+    e.y = pos.y;
+    e.battery = battery;
+    e.speed = speed;
+    e.distance = totalDistance;
+    e.mineralsCollected = totalMinerals;
+    e.action = action;
+    e.isDay = isDay;
+    e.timestamp = getTimeString();
+
+    log.push_back(e);
 }
 
-string RoverState::getStateId() const {
+
+string RoverState::getStateId() const
+{
     stringstream ss;
-    ss << pos.x << "," << pos.y << "," << totalMinerals;
+
+    ss << pos.x << ","
+        << pos.y << ","
+        << battery << ","
+        << isDay << ","
+        << dayTimeRemaining << ",";
+
+    for (const auto& p : collected)
+    {
+        ss << p.x << ":" << p.y << ";";
+    }
+
     return ss.str();
 }
 
-// AStarNode metódusok
-AStarNode::AStarNode(const RoverState& s, int gCost, int hCost,
-    shared_ptr<AStarNode> p, const string& a)
-    : state(s), g(gCost), h(hCost), f(gCost + hCost), parent(p), action(a) {
+AStarNode::AStarNode(
+    const RoverState& s,
+    int gCost,
+    int hCost,
+    shared_ptr<AStarNode> p,
+    const string& a)
+    : state(s),
+    g(gCost),
+    h(hCost),
+    f(gCost + hCost),
+    parent(p),
+    action(a)
+{
 }
 
-bool AStarNode::operator>(const AStarNode& other) const {
+
+bool AStarNode::operator>(const AStarNode& other) const
+{
+    if (f != other.f)
+        return f > other.f;
+
     if (state.totalMinerals != other.state.totalMinerals)
         return state.totalMinerals < other.state.totalMinerals;
-    int lastSpeedThis = 0, lastSpeedOther = 0;
-    if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
-        string act = state.log.back().action;
-        lastSpeedThis = stoi(act.substr(5));
-    }
-    if (!other.state.log.empty() && other.state.log.back().action.find("MOVE") != string::npos) {
-        string act = other.state.log.back().action;
-        lastSpeedOther = stoi(act.substr(5));
-    }
-    if (lastSpeedThis != lastSpeedOther)
-        return lastSpeedThis < lastSpeedOther;
 
-    if (state.timeElapsed != other.state.timeElapsed)
-        return state.timeElapsed > other.state.timeElapsed;
-
-    return false;
+    return g > other.g;
 }
 
-int manhattanDistance(const Position& a, const Position& b) {
-    return abs(a.x - b.x) + abs(a.y - b.y);
-}
-
-int chebyshevDistance(const Position& a, const Position& b) {
+int chebyshevDistance(const Position& a, const Position& b)
+{
     return max(abs(a.x - b.x), abs(a.y - b.y));
 }
 
-vector<Position> getAllMinerals(const vector<vector<Cell>>& map) {
-    vector<Position> minerals;
-    for (int i = 0; i < MAP_SIZE; i++) {
-        for (int j = 0; j < MAP_SIZE; j++) {
-            if (map[i][j].mineral != MINERAL_NONE) {
-                minerals.push_back(Position(i, j));
+
+vector<Position> getAllMinerals(const vector<vector<Cell>>& map)
+{
+    vector<Position> v;
+
+    for (int i = 0; i < MAP_SIZE; i++)
+        for (int j = 0; j < MAP_SIZE; j++)
+            if (map[i][j].mineral != MINERAL_NONE)
+                v.push_back(Position(i, j));
+
+    return v;
+}
+
+int heuristic(
+    const RoverState& s,
+    int maxTime,
+    const Position& start)
+{
+    int timeLeft = maxTime - s.timeElapsed;
+
+    if (timeLeft <= 0)
+        return 1000000;
+
+    int remaining = allMinerals.size() - s.totalMinerals;
+
+    if (remaining == 0)
+    {
+        int d = chebyshevDistance(s.pos, start);
+        return d * 2;
+    }
+
+    int best = 999999;
+
+    for (const auto& m : allMinerals)
+    {
+        if (s.collected.find(m) == s.collected.end())
+        {
+            int d = chebyshevDistance(s.pos, m);
+            best = min(best, d);
+        }
+    }
+
+    return best + remaining * 5;
+}
+
+
+int calculateMoveEnergy(int speed, bool isDay)
+{
+    int e = K * speed * speed;
+
+    if (isDay)
+        e -= 10;
+
+    return e;
+}
+
+int calculateMineEnergy(bool isDay)
+{
+    int e = 2;
+
+    if (isDay)
+        e -= 10;
+
+    return e;
+}
+
+int calculateWaitEnergy(bool isDay)
+{
+    int e = 1;
+
+    if (isDay)
+        e -= 10;
+
+    return e;
+}
+
+void updateTime(RoverState& s)
+{
+    s.timeElapsed++;
+    s.dayTimeRemaining--;
+
+    if (s.dayTimeRemaining == 0)
+    {
+        s.isDay = !s.isDay;
+
+        s.dayTimeRemaining =
+            s.isDay ? DAY_DURATION
+            : NIGHT_DURATION;
+    }
+}
+
+bool readMap(
+    const string& filename,
+    vector<vector<Cell>>& map,
+    Position& startPos)
+{
+    ifstream f(filename);
+
+    if (!f.is_open())
+        return false;
+
+    string line;
+    int row = 0;
+
+    while (getline(f, line) && row < MAP_SIZE)
+    {
+        stringstream ss(line);
+        string tok;
+
+        int col = 0;
+
+        while (getline(ss, tok, ',') && col < MAP_SIZE)
+        {
+            char c = tok[0];
+
+            if (c == '#')
+                map[row][col].isObstacle = true;
+
+            if (c == 'B')
+                map[row][col].mineral = MINERAL_BLUE;
+
+            if (c == 'Y')
+                map[row][col].mineral = MINERAL_YELLOW;
+
+            if (c == 'G')
+                map[row][col].mineral = MINERAL_GREEN;
+
+            if (c == 'S')
+            {
+                map[row][col].isStart = true;
+                startPos = Position(row, col);
             }
+
+            col++;
         }
-    }
-    return minerals;
-}
 
-vector<Position> allMinerals;
-
-int heuristic(const RoverState& state, int maxTime, const Position& startPos) {
-    int timeLeft = maxTime - state.timeElapsed;
-    if (timeLeft <= 0) return -1000;
-
-    int remainingCount = allMinerals.size() - state.totalMinerals;
-
-    if (remainingCount == 0) {
-        int distToStart = chebyshevDistance(state.pos, startPos);
-        if (distToStart <= timeLeft) {
-
-            return 100;
-        }
-        else {
-            return -500;
-        }
+        row++;
     }
 
-    int minDist = INT_MAX;
-    for (const auto& m : allMinerals) {
-        if (state.collected.find(m) == state.collected.end()) {
-            int dist = chebyshevDistance(state.pos, m);
-            minDist = min(minDist, dist);
-        }
-    }
+    allMinerals = getAllMinerals(map);
 
-    int speedBonus = 0;
-    if (!state.log.empty() && state.log.back().action.find("MOVE") != string::npos) {
-        string act = state.log.back().action;
-        int lastSpeed = stoi(act.substr(5));
-        speedBonus = lastSpeed * 2;
-    }
+    cout << "Minerals: "
+        << allMinerals.size()
+        << endl;
 
-    int energyBonus = 0;
-    if (state.battery > 70) energyBonus = 5;
-    else if (state.battery < 20) energyBonus = -10;
-
-    int dayBonus = state.isDay ? 3 : -3;
-
-    return remainingCount * 100 - minDist + speedBonus + energyBonus + dayBonus;
-}
-
-bool isWalkable(int x, int y, const vector<vector<Cell>>& map) {
-    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) {
-        return false;
-    }
-    if (map[x][y].isObstacle) {
-        return false;
-    }
     return true;
 }
 
-bool isMineral(int x, int y, const vector<vector<Cell>>& map) {
-    if (x < 0 || x >= MAP_SIZE || y < 0 || y >= MAP_SIZE) return false;
+bool isWalkable(
+    int x,
+    int y,
+    const vector<vector<Cell>>& map)
+{
+    if (x < 0 || y < 0 ||
+        x >= MAP_SIZE ||
+        y >= MAP_SIZE)
+        return false;
+
+    return !map[x][y].isObstacle;
+}
+
+bool isMineral(
+    int x,
+    int y,
+    const vector<vector<Cell>>& map)
+{
     return map[x][y].mineral != MINERAL_NONE;
 }
 
-int calculateMoveEnergy(int speed, bool isDay) {
-    int energy = K * speed * speed;
-    if (isDay) energy -= 10;
-    return energy;
-}
 
-int calculateMineEnergy(bool isDay) {
-    int energy = 2;
-    if (isDay) energy -= 10;
-    return energy;
-}
+const int dx[] = { -1,-1,-1,0,0,1,1,1 };
+const int dy[] = { -1,0,1,-1,1,-1,0,1 };
 
-int calculateWaitEnergy(bool isDay) {
-    int energy = 1;
-    if (isDay) energy -= 10;
-    return energy;
-}
+pair<vector<LogEntry>, int>
+aStarSearch(
+    int maxTime,
+    const vector<vector<Cell>>& map,
+    const Position& startPos)
+{
+    auto t0 = chrono::steady_clock::now();
 
-void updateTime(RoverState& state) {
-    state.timeElapsed++;
-    state.dayTimeRemaining--;
+    priority_queue<
+        AStarNode,
+        vector<AStarNode>,
+        greater<AStarNode>> open;
 
-    if (state.dayTimeRemaining == 0) {
-        state.isDay = !state.isDay;
-        state.dayTimeRemaining = state.isDay ? DAY_DURATION : NIGHT_DURATION;
-    }
-}
-
-bool readMap(const string& filename, vector<vector<Cell>>& map, Position& startPos) {
-    ifstream mapFile(filename);
-    if (!mapFile.is_open()) {
-        cerr << "Error: Cannot open map file: " << filename << endl;
-        return false;
-    }
-
-    string line;
-    int sor = 0;
-
-    while (getline(mapFile, line) && sor < MAP_SIZE) {
-        stringstream ss(line);
-        string token;
-        int oszlop = 0;
-
-        while (getline(ss, token, ',') && oszlop < MAP_SIZE) {
-            token.erase(0, token.find_first_not_of(" \t"));
-            token.erase(token.find_last_not_of(" \t") + 1);
-
-            if (token.empty()) {
-                oszlop++;
-                continue;
-            }
-
-            char c = token[0];
-
-            switch (c) {
-            case '#':
-                map[sor][oszlop].isObstacle = true;
-                break;
-            case 'B':
-                map[sor][oszlop].mineral = MINERAL_BLUE;
-                break;
-            case 'Y':
-                map[sor][oszlop].mineral = MINERAL_YELLOW;
-                break;
-            case 'G':
-                map[sor][oszlop].mineral = MINERAL_GREEN;
-                break;
-            case 'S':
-                map[sor][oszlop].isStart = true;
-                startPos = Position(sor, oszlop);
-                break;
-            default:
-                break;
-            }
-            oszlop++;
-        }
-        sor++;
-    }
-
-    mapFile.close();
-
-    allMinerals = getAllMinerals(map);
-    cout << "Total minerals on map: " << allMinerals.size() << endl;
-
-    cout << "\nTerkep ellenorzes (elso 5 sor):" << endl;
-    for (int i = 0; i < 5 && i < MAP_SIZE; i++) {
-        for (int j = 0; j < 30 && j < MAP_SIZE; j++) {
-            if (map[i][j].isObstacle) cout << "#";
-            else if (map[i][j].mineral != MINERAL_NONE) {
-                if (map[i][j].mineral == MINERAL_BLUE) cout << "B";
-                else if (map[i][j].mineral == MINERAL_YELLOW) cout << "Y";
-                else if (map[i][j].mineral == MINERAL_GREEN) cout << "G";
-            }
-            else if (map[i][j].isStart) cout << "S";
-            else cout << ".";
-        }
-        cout << "  <- " << i << ". sor" << endl;
-    }
-    cout << endl;
-
-    return true;
-}
-
-const int dx[] = { -1, -1, -1, 0, 0, 1, 1, 1 };
-const int dy[] = { -1, 0, 1, -1, 1, -1, 0, 1 };
-
-pair<vector<LogEntry>, int> aStarSearch(int maxTime, const vector<vector<Cell>>& map, const Position& startPos) {
-    auto startTime = chrono::steady_clock::now();
-
-    priority_queue<AStarNode, vector<AStarNode>, greater<AStarNode>> openSet;
     unordered_map<string, int> bestG;
 
-    RoverState startState;
-    startState.pos = startPos;
-    startState.path.push_back(startPos);
-    startState.addLogEntry(0, "START");
+    RoverState start;
+    start.pos = startPos;
 
-    int hStart = heuristic(startState, maxTime, startPos);
-    openSet.push(AStarNode(startState, 0, hStart));
-    bestG[startState.getStateId()] = 0;
+    start.addLogEntry(0, "START");
 
-    int maxMinerals = 0;
+    int h0 = heuristic(start, maxTime, startPos);
+
+    open.push(AStarNode(start, 0, h0));
+    bestG[start.getStateId()] = 0;
+
     RoverState bestState;
-    int bestTimeAtStart = INT_MAX;
+    int bestMinerals = 0;
 
     int iterations = 0;
-    const int MAX_ITERATIONS = 5000000;
 
-    while (!openSet.empty() && iterations < MAX_ITERATIONS) {
+    while (!open.empty())
+    {
         iterations++;
 
-        auto currentTime = chrono::steady_clock::now();
-        auto elapsed = chrono::duration_cast<chrono::seconds>(currentTime - startTime).count();
-        if (elapsed > 120) {
-            cout << "Search timeout after 60 seconds, stopping..." << endl;
-            break;
-        }
+        AStarNode cur = open.top();
+        open.pop();
 
-        AStarNode current = openSet.top();
-        openSet.pop();
-
-        string stateId = current.state.getStateId();
-        if (bestG.find(stateId) != bestG.end() && bestG[stateId] < current.g) {
+        if (cur.state.timeElapsed >= maxTime)
             continue;
-        }
 
-        if (current.state.pos == startPos) {
-            if (current.state.totalMinerals > maxMinerals) {
-                maxMinerals = current.state.totalMinerals;
-                bestState = current.state;
-                bestTimeAtStart = current.state.timeElapsed;
-                cout << "Found solution: " << maxMinerals << " minerals, returned to start at time "
-                    << current.state.getTimeString() << endl;
-            }
-            else if (current.state.totalMinerals == maxMinerals &&
-                current.state.timeElapsed < bestTimeAtStart) {
-                bestState = current.state;
-                bestTimeAtStart = current.state.timeElapsed;
-                cout << "Better time for " << maxMinerals << " minerals: "
-                    << current.state.getTimeString() << endl;
+        if (cur.state.pos == startPos)
+        {
+            if (cur.state.totalMinerals > bestMinerals)
+            {
+                bestMinerals = cur.state.totalMinerals;
+                bestState = cur.state;
+
+                cout << "BEST = "
+                    << bestMinerals
+                    << endl;
             }
         }
+        for (int i = 0; i < 8; i++)
+        {
+            int nx = cur.state.pos.x + dx[i];
+            int ny = cur.state.pos.y + dy[i];
 
-        if (current.state.totalMinerals == allMinerals.size() && current.state.pos == startPos) {
-            bestState = current.state;
-            cout << "Optimal solution found! Collected all minerals and returned to start." << endl;
-            break;
-        }
+            if (!isWalkable(nx, ny, map))
+                continue;
 
-        if (current.state.timeElapsed >= maxTime) {
-            continue;
-        }
+            for (int speed = 1; speed <= 3; speed++)
+            {
+                RoverState ns = cur.state;
 
-        for (int i = 0; i < 8; i++) {
-            int newX = current.state.pos.x + dx[i];
-            int newY = current.state.pos.y + dy[i];
+                ns.pos = Position(nx, ny);
+                ns.totalDistance++;
 
-            if (!isWalkable(newX, newY, map)) continue;
+                int e = calculateMoveEnergy(speed, ns.isDay);
 
-            for (int speed = 1; speed <= 3; speed++) {
-                RoverState newState = current.state;
-                newState.pos = Position(newX, newY);
-                newState.totalDistance++;
+                ns.battery = max(
+                    0,
+                    min(MAX_BATTERY,
+                        ns.battery - e));
 
-                int energyChange = calculateMoveEnergy(speed, current.state.isDay);
-                newState.battery = max(0, min(MAX_BATTERY,
-                    current.state.battery - energyChange));
+                if (ns.battery <= 0 &&
+                    !ns.isDay)
+                    continue;
 
-                if (newState.battery <= 0 && !newState.isDay) continue;
+                updateTime(ns);
 
-                updateTime(newState);
+                ns.addLogEntry(speed, "MOVE");
 
-                string action = "MOVE_" + to_string(speed);
-                newState.addLogEntry(speed, action);
-                newState.path.push_back(newState.pos);
+                string id = ns.getStateId();
+                int g = ns.timeElapsed;
 
-                string newStateId = newState.getStateId();
-                int newG = newState.timeElapsed;
+                if (bestG.find(id) == bestG.end()
+                    || g < bestG[id])
+                {
+                    bestG[id] = g;
 
-                if (bestG.find(newStateId) == bestG.end() || newG < bestG[newStateId]) {
-                    bestG[newStateId] = newG;
-                    int h = heuristic(newState, maxTime, startPos);
-                    openSet.push(AStarNode(newState, newG, h,
-                        make_shared<AStarNode>(current), action));
+                    int h =
+                        heuristic(
+                            ns,
+                            maxTime,
+                            startPos);
+
+                    open.push(
+                        AStarNode(ns, g, h));
                 }
             }
         }
+        if (isMineral(
+            cur.state.pos.x,
+            cur.state.pos.y,
+            map) &&
+            cur.state.collected.find(
+                cur.state.pos)
+            == cur.state.collected.end())
+        {
+            RoverState ns = cur.state;
 
-        if (isMineral(current.state.pos.x, current.state.pos.y, map) &&
-            current.state.collected.find(current.state.pos) == current.state.collected.end()) {
+            ns.collected.insert(ns.pos);
+            ns.totalMinerals++;
 
-            RoverState newState = current.state;
+            updateTime(ns);
 
-            int energyChange = calculateMineEnergy(current.state.isDay);
-            newState.battery = max(0, min(MAX_BATTERY,
-                current.state.battery - energyChange));
+            ns.addLogEntry(0, "MINE");
 
-            newState.collected.insert(current.state.pos);
-            newState.totalMinerals++;
+            string id = ns.getStateId();
+            int g = ns.timeElapsed;
 
-            updateTime(newState);
+            if (bestG.find(id) == bestG.end()
+                || g < bestG[id])
+            {
+                bestG[id] = g;
 
-            if (newState.battery <= 0 && !newState.isDay) {
-                continue;
-            }
+                int h =
+                    heuristic(
+                        ns,
+                        maxTime,
+                        startPos);
 
-            newState.addLogEntry(0, "MINE");
-            newState.path.push_back(newState.pos);
-
-            string newStateId = newState.getStateId();
-            int newG = newState.timeElapsed;
-
-            if (bestG.find(newStateId) == bestG.end() || newG < bestG[newStateId]) {
-                bestG[newStateId] = newG;
-                int h = heuristic(newState, maxTime, startPos);
-                openSet.push(AStarNode(newState, newG, h,
-                    make_shared<AStarNode>(current), "MINE"));
-            }
-        }
-
-        if (!current.state.isDay && current.state.battery < 30) {
-            RoverState newState = current.state;
-
-            int energyChange = calculateWaitEnergy(current.state.isDay);
-            newState.battery = max(0, min(MAX_BATTERY,
-                current.state.battery - energyChange));
-
-            updateTime(newState);
-
-            newState.addLogEntry(0, "WAIT");
-            newState.path.push_back(newState.pos);
-
-            string newStateId = newState.getStateId();
-            int newG = newState.timeElapsed;
-
-            if (bestG.find(newStateId) == bestG.end() || newG < bestG[newStateId]) {
-                bestG[newStateId] = newG;
-                int h = heuristic(newState, maxTime, startPos);
-                openSet.push(AStarNode(newState, newG, h,
-                    make_shared<AStarNode>(current), "WAIT"));
+                open.push(
+                    AStarNode(ns, g, h));
             }
         }
     }
 
-    auto endTime = chrono::steady_clock::now();
-    auto elapsed = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count();
-    cout << "Search completed in " << elapsed << " ms" << endl;
-    cout << "Iterations: " << iterations << endl;
+    cout << "Iterations = "
+        << iterations
+        << endl;
 
-    if (maxMinerals > 0) {
-        return make_pair(bestState.log, maxMinerals);
-    }
-
-    return make_pair(vector<LogEntry>(), 0);
+    return make_pair(
+        bestState.log,
+        bestMinerals);
 }
 
-void saveLogToFile(const vector<LogEntry>& log, const string& filename) {
-    ofstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Error: Cannot create log file: " << filename << endl;
-        return;
-    }
+void saveLogToFile(
+    const vector<LogEntry>& log,
+    const string& filename)
+{
+    ofstream f(filename);
 
-    file << "TimeStep,X,Y,Battery,Speed,Distance,Minerals,Action,TimeOfDay,Timestamp\n";
+    f << "TimeStep,X,Y,Battery,Speed,Distance,"
+        "Minerals,Action,TimeOfDay,Timestamp\n";
 
-    for (const auto& entry : log) {
-        file << entry.toString() << "\n";
-    }
-
-    file.close();
-    cout << "Log saved to: " << filename << endl;
+    for (const auto& e : log)
+        f << e.toString() << "\n";
 }

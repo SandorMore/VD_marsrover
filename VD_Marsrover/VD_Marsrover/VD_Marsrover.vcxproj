@@ -126,6 +126,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="fast_f.cpp" />
     <ClCompile Include="file_handler.cpp" />
     <ClCompile Include="img_stuff.cpp" />
     <ClCompile Include="main.cpp" />

@@ -2,6 +2,7 @@
 
 const float CELL_SIZE = 1.0f;
 
+
 Vector3 gridToWorld(const Position& p)
 {
     float offset = MAP_SIZE * CELL_SIZE * 0.5f;
@@ -12,6 +13,7 @@ Vector3 gridToWorld(const Position& p)
         p.y * CELL_SIZE - offset
     };
 }
+
 
 Position worldToGrid(const Vector3& v)
 {

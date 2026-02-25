@@ -1,10 +1,14 @@
 #include "renderer.h"
 #include "transforms.h"
+#include "rover.h"
+
+#include "raylib.h"
+#include <cmath>
 
 #define WIDTH 1200
 #define HEIGHT 800
 #define TARGET_FPS 60
-#define RETURN_TIME 5
+#define MOVE_DELAY 30
 
 void drawMap(const std::vector<std::vector<Cell>>& map)
 {
@@ -19,11 +23,9 @@ void drawMap(const std::vector<std::vector<Cell>>& map)
 
             if (map[x][y].isObstacle)
                 cell_color = DARKGRAY;
-
-            if (map[x][y].mineral != MINERAL_NONE)
+            else if (map[x][y].mineral != MINERAL_NONE)
                 cell_color = BLUE;
-
-            if (map[x][y].isStart)
+            else if (map[x][y].isStart)
                 cell_color = GREEN;
 
             DrawCube(pos, CELL_SIZE, 0.1f, CELL_SIZE, cell_color);
@@ -32,33 +34,63 @@ void drawMap(const std::vector<std::vector<Cell>>& map)
     }
 }
 
-void main_loop(const char* title,
+void main_loop(
+    const char* title,
     const std::vector<std::vector<Cell>>& map,
-    const Position& startPos)
+    const Position& startPos,
+    const std::vector<Position>& route
+)
 {
     InitWindow(WIDTH, HEIGHT, title);
+
+    if (!IsWindowReady())
+    {
+        printf("Window failed!\n");
+        return;
+    }
+
     DisableCursor();
 
     Camera3D camera = { 0 };
-
-    camera.position = { 50.f, 50.f, 50.f };
-    camera.target = { 0.f,0.f,0.f };
-    camera.up = { 0.f,1.f,0.f };
+    camera.position = { 60.f, 60.f, 60.f };
+    camera.target = gridToWorld(startPos);
+    camera.up = { 0.f, 1.f, 0.f };
     camera.fovy = 45.f;
     camera.projection = CAMERA_PERSPECTIVE;
 
     Model roverModel = LoadModel("model4.glb");
 
+    int routeIndex = 0;
+    int frameCounter = 0;
+
     Vector3 roverPos = gridToWorld(startPos);
 
-    SetTargetFPS(60);
+    SetTargetFPS(TARGET_FPS);
 
     while (!WindowShouldClose())
     {
+        frameCounter++;
+        if (frameCounter >= MOVE_DELAY && routeIndex < route.size())
+        {
+            roverPos = gridToWorld(route[routeIndex]);
+            routeIndex++;
+            frameCounter = 0;
+        }
+
+        Vector3 targetPos = roverPos;
+        camera.target.x += (targetPos.x - camera.target.x) * 0.1f;
+        camera.target.y += (targetPos.y - camera.target.y) * 0.1f;
+        camera.target.z += (targetPos.z - camera.target.z) * 0.1f;
+
+        float radius = 15.f;
+        float angle = GetTime() * 0.5f;
+        camera.position.x = camera.target.x + radius * cosf(angle);
+        camera.position.z = camera.target.z + radius * sinf(angle);
+        camera.position.y = camera.target.y + 3.f;
+
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
         BeginDrawing();
-
         ClearBackground(RAYWHITE);
 
         BeginMode3D(camera);
@@ -70,6 +102,7 @@ void main_loop(const char* title,
         EndMode3D();
 
         DrawText("Mars Rover", 10, 10, 20, GREEN);
+        DrawFPS(10, 40);
 
         EndDrawing();
     }
