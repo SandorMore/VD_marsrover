@@ -126,22 +126,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="dn_cycle.cpp" />
     <ClCompile Include="fast_f.cpp" />
-    <ClCompile Include="file_handler.cpp" />
-    <ClCompile Include="img_stuff.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="renderer.cpp" />
     <ClCompile Include="rover.cpp" />
-    <ClCompile Include="transforms.cpp" />
+    <ClCompile Include="VisualizationHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="dn_cycle.h" />
-    <ClInclude Include="misc.h" />
-    <ClInclude Include="renderer.h" />
     <ClInclude Include="rover.h" />
-    <ClInclude Include="stb_image.h" />
-    <ClInclude Include="transforms.h" />
+    <ClInclude Include="VisualizationHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\ű.png" />
