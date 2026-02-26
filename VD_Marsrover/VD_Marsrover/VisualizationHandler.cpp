@@ -1,30 +1,39 @@
 #include "VisualizationHandler.h"
-#include <cstdlib>
-#include <iostream>
+
 
 #define numVAOs 1
 
 GLuint renderingProgram;
 GLuint vao[numVAOs];
 
-GLuint createShaderProgram() {
-	
-	const char* vshaderSource =
-		"#version 430   \n"
-		"void main(void) \n"
-		"{gl_Position = vec4(0.0 ,0.0 ,0.0 ,1.0);}";
 
-	const char* fshaderSource =
-		"#version 430   \n"
-		"out vec4 color;\n"
-		"void main(void) \n"
-		"{color = vec4(0.0 ,0.0 ,1.0 ,1.0);}";
+std::string readShaderSource(const char* filePath)
+{
+	std::string content;
+	std::ifstream fileStream(filePath, std::ios::in);
+	std::string line = "";
+
+	while (!fileStream.eof()) {
+		std::getline(fileStream, line);
+		content.append(line + "\n");
+	}
+	fileStream.close();
+	return content;
+}
+
+GLuint createShaderProgram() {
 
 	GLuint vShader = glCreateShader(GL_VERTEX_SHADER);
 	GLuint fShader = glCreateShader(GL_FRAGMENT_SHADER);
 
-	glShaderSource(vShader, 1, &vshaderSource, nullptr);
-	glShaderSource(fShader, 1, &fshaderSource, nullptr);
+	std::string vertShaderStr = readShaderSource("vertShaderSource.glsl");
+	std::string fragShaderStr = readShaderSource("fragShaderSource.glsl");
+	const char* vertShaderSrc = vertShaderStr.c_str();
+	const char* fragShaderSrc = fragShaderStr.c_str();
+
+
+	glShaderSource(vShader, 1, &vertShaderSrc, nullptr);
+	glShaderSource(fShader, 1, &fragShaderSrc, nullptr);
 
 	glCompileShader(vShader);
 	glCompileShader(fShader);
@@ -70,11 +79,11 @@ void prontProgramLog(GLuint program)
 {
 	int len;
 	int chrWritten;
-	char* log;
+	char* log = (char*)malloc(1);
 
 	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
 	if (len > 0) {
-		log = (char*)malloc(len);
+		log = (char*)realloc(log, len);
 		glGetProgramInfoLog(program, len, &chrWritten, log);
 		std::cout << "Program info: " << log << "\n";
 	}
@@ -92,3 +101,4 @@ bool checkOpenGLError()
 	}
 	return found;
 }
+

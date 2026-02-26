@@ -141,6 +141,10 @@
   <ItemGroup>
     <Text Include="asd.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="fragShaderSource.glsl" />
+    <None Include="vertShaderSource.glsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
