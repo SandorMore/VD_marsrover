@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "rover.h"
+#include "GLFW/glfw3.h"
 
 #include <vector>
 #include <string>
@@ -24,7 +25,7 @@ int main()
 
     auto route = buildFastRoute(map, start_position);
 
-    main_loop("VD_Marsrover", map, start_position, route);
+    //main_loop("VD_Marsrover", map, start_position, route);
 
     return 0;
 }
