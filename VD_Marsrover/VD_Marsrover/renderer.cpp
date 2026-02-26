@@ -10,6 +10,36 @@
 #define TARGET_FPS 60
 #define MOVE_DELAY 20
 
+Color GetSkyColor(float time)
+{
+    Color day = { 255, 240, 170, 255 };
+    Color sunset = { 220, 90, 40, 255 };
+    Color night = { 15, 10, 25, 255 };
+
+    Color result;
+
+    if (time < 0.5f)
+    {
+        float t = time * 2.0f;
+
+        result.r = day.r + (sunset.r - day.r) * t;
+        result.g = day.g + (sunset.g - day.g) * t;
+        result.b = day.b + (sunset.b - day.b) * t;
+        result.a = 255;
+    }
+    else
+    {
+        float t = (time - 0.5f) * 2.0f;
+
+        result.r = sunset.r + (night.r - sunset.r) * t;
+        result.g = sunset.g + (night.g - sunset.g) * t;
+        result.b = sunset.b + (night.b - sunset.b) * t;
+        result.a = 255;
+    }
+
+    return result;
+}
+
 void drawMap(const std::vector<std::vector<Cell>>& map)
 {
     for (int x = 0; x < MAP_SIZE; x++)
@@ -64,6 +94,7 @@ void main_loop(const char* title, const std::vector<std::vector<Cell>>& map, con
 
     while (!WindowShouldClose())
     {
+        float dayTime = fmod(GetTime() * 0.02f, 1.0f);
         frameCounter++;
         if (frameCounter >= MOVE_DELAY && routeIndex < route.size())
         {
@@ -86,7 +117,7 @@ void main_loop(const char* title, const std::vector<std::vector<Cell>>& map, con
         UpdateCamera(&camera, CAMERA_ORBITAL);
 
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(GetSkyColor(dayTime));
 
         BeginMode3D(camera);
 
