@@ -21,42 +21,18 @@
     <ClCompile Include="rover.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="img_stuff.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="file_handler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="transforms.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="fast_f.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dn_cycle.cpp">
+    <ClCompile Include="VisualizationHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stb_image.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="rover.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="misc.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="transforms.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="renderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="dn_cycle.h">
+    <ClInclude Include="VisualizationHandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
