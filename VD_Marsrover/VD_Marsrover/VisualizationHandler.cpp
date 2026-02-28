@@ -1,5 +1,5 @@
 #include "VisualizationHandler.h"
-
+//graphics
 #define numVAOs 1
 #define numVBOs 2
 
