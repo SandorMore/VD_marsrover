@@ -55,7 +55,6 @@ int main()
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     while (!glfwWindowShouldClose(window)) {
-        glClear(GL_COLOR_BUFFER_BIT);
         display(window, glfwGetTime());
         glfwSwapBuffers(window);
         glfwPollEvents();

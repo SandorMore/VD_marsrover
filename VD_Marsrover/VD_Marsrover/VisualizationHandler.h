@@ -14,7 +14,7 @@
 
 void setupVertices(void);
 
-GLuint createShaderProgram();
+GLuint createShaderProgram(std::string vertShader, std::string fragShader);
 
 void init(GLFWwindow* window);
 
