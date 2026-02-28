@@ -5,4 +5,4 @@
 ű
 
 
-dependency: stb_image, raylib
+dependency: openGL, GLM, Eigne?, GLFW3
