@@ -192,9 +192,11 @@ void prontProgramLog(GLuint program)
 
 	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
 	if (len > 0) {
-		log = (char*)realloc(log, len);
-		glGetProgramInfoLog(program, len, &chrWritten, log);
-		std::cout << "Program info: " << log << "\n";
+		log = ((char*)realloc(log, len) == nullptr) ? (char*)malloc(10) : nullptr;
+		if (log) {
+			glGetProgramInfoLog(program, len, &chrWritten, log);
+			std::cout << "Program info: " << log << "\n";
+		}
 	}
 	free(log);
 }
