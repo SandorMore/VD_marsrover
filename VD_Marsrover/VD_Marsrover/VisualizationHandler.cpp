@@ -1,11 +1,16 @@
 #include "VisualizationHandler.h"
 
-
 #define numVAOs 1
+#define numVBOs 2
 
-GLuint renderingProgram;
+float camerX, cameraY, cameraZ;
+float cubeX, cubeY, cubeZ;
+
+GLuint rendringProgram;
 GLuint vao[numVAOs];
+GLuint vbo[numVBOs];
 
+GLuint mvLoc, pLoc;
 
 std::string readShaderSource(const char* filePath)
 {
@@ -19,6 +24,15 @@ std::string readShaderSource(const char* filePath)
 	}
 	fileStream.close();
 	return content;
+}
+
+void setupVertices(void)
+{
+	float vertexPosition[108] = {
+		-1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0,
+		1.0, -1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0,
+
+	}
 }
 
 GLuint createShaderProgram() {
@@ -39,7 +53,7 @@ GLuint createShaderProgram() {
 	glCompileShader(fShader);
 
 	GLuint vfprogram = glCreateProgram();
-	
+
 	glAttachShader(vfprogram, vShader);
 	glAttachShader(vfprogram, fShader);
 
@@ -101,4 +115,5 @@ bool checkOpenGLError()
 	}
 	return found;
 }
+
 
