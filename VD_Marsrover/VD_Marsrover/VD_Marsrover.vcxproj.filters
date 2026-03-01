@@ -46,4 +46,8 @@
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="fragShaderSource.glsl" />
+    <None Include="vertShaderSource.glsl" />
+  </ItemGroup>
 </Project>
