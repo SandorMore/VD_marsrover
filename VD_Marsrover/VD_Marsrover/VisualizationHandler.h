@@ -27,3 +27,5 @@ void prontProgramLog(GLuint program);
 bool checkOpenGLError();
 
 std::string readShaderSource(const char* filePath);
+
+void processInput(GLFWwindow* window);
