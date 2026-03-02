@@ -126,13 +126,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="fast_f.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rover.cpp" />
+    <ClCompile Include="Skybox.cpp" />
     <ClCompile Include="VisualizationHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="rover.h" />
+    <ClInclude Include="Skybox.h" />
     <ClInclude Include="VisualizationHandler.h" />
   </ItemGroup>
   <ItemGroup>
