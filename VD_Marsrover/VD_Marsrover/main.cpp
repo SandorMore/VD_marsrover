@@ -1,27 +1,113 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <sstream>
 #define GLM_ENABLE_EXPERIMENTAL
 #include "Camera.h"
+#include "HeightMap.h"
+#include "TerrainRenderer.h"
+#include "rover.h"
 
-// Function prototypes
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window, float deltaTime);
+void updateDayNightCycle(float deltaTime);
 
-// Camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(25.0f, 20.0f, 25.0f));
 float lastX = 400.0f;
 float lastY = 300.0f;
 bool firstMouse = true;
 
-// Timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-int main() {
-    // Initialize GLFW
+HeightMap g_heightMap;
+TerrainRenderer g_terrainRenderer;
+
+// Rover simulation / visualization state
+std::vector<std::vector<Cell>> g_roverMap(MAP_SIZE, std::vector<Cell>(MAP_SIZE));
+Position g_roverStart;
+std::vector<Position> g_roverPath;
+size_t g_roverPathIndex = 0;
+float g_roverAnimTime = 0.0f;
+const float g_roverStepDuration = 0.1f; // seconds per path step
+
+GLuint g_roverVAO = 0;
+GLuint g_roverVBO = 0;
+GLuint g_roverEBO = 0;
+
+float g_timeOfDay = 6.0f;
+bool g_isDay = true;
+glm::vec3 g_ambientLight = glm::vec3(0.8f, 0.8f, 0.7f);
+glm::vec3 g_sunColor = glm::vec3(1.0f, 0.95f, 0.9f);
+
+bool g_showWireframe = false;
+bool g_showGrid = true;
+float g_terrainScale = 1.0f;
+
+GLuint shaderProgram;
+
+// Simple white quad used to visualize the rover as a box
+void setupRoverMesh() {
+    if (g_roverVAO != 0) return;
+
+    float size = 0.4f;
+    float y = 0.0f;
+
+    // position (3) + color (3), white color
+    float vertices[] = {
+        -size, y, -size,  1.0f, 1.0f, 1.0f,
+         size, y, -size,  1.0f, 1.0f, 1.0f,
+         size, y,  size,  1.0f, 1.0f, 1.0f,
+        -size, y,  size,  1.0f, 1.0f, 1.0f
+    };
+
+    unsigned int indices[] = {
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    glGenVertexArrays(1, &g_roverVAO);
+    glGenBuffers(1, &g_roverVBO);
+    glGenBuffers(1, &g_roverEBO);
+
+    glBindVertexArray(g_roverVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, g_roverVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_roverEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
+void cleanupRoverMesh() {
+    if (g_roverVAO) {
+        glDeleteVertexArrays(1, &g_roverVAO);
+        glDeleteBuffers(1, &g_roverVBO);
+        glDeleteBuffers(1, &g_roverEBO);
+        g_roverVAO = g_roverVBO = g_roverEBO = 0;
+    }
+}
+
+int main(int argc, char** argv) {
+    // Default map file is asd.txt, unless overridden by command-line argument
+    std::string mapFile = "asd.txt";
+    if (argc > 1) {
+        mapFile = argv[1];
+    }
+
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return -1;
@@ -31,8 +117,7 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // Create window
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Movable Camera", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1200, 800, "Mars Terrain Visualization", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -44,10 +129,8 @@ int main() {
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
 
-    // Capture mouse
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-    // Initialize GLEW
     glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
         std::cerr << "Failed to initialize GLEW" << std::endl;
@@ -55,22 +138,81 @@ int main() {
         return -1;
     }
 
-    // Enable depth testing
     glEnable(GL_DEPTH_TEST);
+    // Disable face culling for now so terrain is visible
+    glDisable(GL_CULL_FACE);
 
-    // Simple shader program
+    std::cout << "Loading map: " << mapFile << std::endl;
+
+    // Try to load the requested map file (default: asd.txt).
+    // If it fails, generate a default map into the SAME file and load it again.
+    if (!g_heightMap.loadFromCSV(mapFile)) {
+        std::cerr << "Failed to load map '" << mapFile
+                  << "'. Creating default 50x50 map." << std::endl;
+
+        std::ofstream defaultMap(mapFile);
+        if (!defaultMap.is_open()) {
+            std::cerr << "Could not create default map file '" << mapFile << "'. Exiting."
+                      << std::endl;
+            glfwTerminate();
+            return -1;
+        }
+
+        for (int i = 0; i < 50; i++) {
+            for (int j = 0; j < 50; j++) {
+                if (i == 25 && j == 25) defaultMap << 'S';
+                else if (rand() % 10 == 0) defaultMap << 'B';
+                else if (rand() % 15 == 0) defaultMap << 'Y';
+                else if (rand() % 20 == 0) defaultMap << 'G';
+                else if (rand() % 8 == 0) defaultMap << '#';
+                else defaultMap << '.';
+            }
+            defaultMap << '\n';
+        }
+        defaultMap.close();
+
+        if (!g_heightMap.loadFromCSV(mapFile)) {
+            std::cerr << "Failed to load generated default map from '" << mapFile
+                      << "'. Exiting." << std::endl;
+            glfwTerminate();
+            return -1;
+        }
+    }
+
+    g_heightMap.generateHeights(0.0f, 0.5f);
+
+    if (!g_terrainRenderer.initialize(&g_heightMap)) {
+        std::cerr << "Failed to initialize terrain renderer" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+
+    // Prepare rover logical map and build a fast A* based route using the same file
+    if (!readMap(mapFile, g_roverMap, g_roverStart)) {
+        std::cerr << "Failed to read rover map from '" << mapFile << "'" << std::endl;
+    } else {
+        g_roverPath = buildFastRoute(g_roverMap, g_roverStart);
+        std::cout << "Fast A* route length (steps): " << g_roverPath.size() << std::endl;
+    }
+
+    // Setup rover mesh for visualization
+    setupRoverMesh();
+
     const char* vertexShaderSource = R"(
         #version 330 core
         layout (location = 0) in vec3 aPos;
         layout (location = 1) in vec3 aColor;
         
         out vec3 ourColor;
+        out vec3 FragPos;
         
         uniform mat4 model;
         uniform mat4 view;
         uniform mat4 projection;
+        uniform float timeOfDay;
         
         void main() {
+            FragPos = vec3(model * vec4(aPos, 1.0));
             gl_Position = projection * view * model * vec4(aPos, 1.0);
             ourColor = aColor;
         }
@@ -79,94 +221,99 @@ int main() {
     const char* fragmentShaderSource = R"(
         #version 330 core
         in vec3 ourColor;
+        in vec3 FragPos;
         out vec4 FragColor;
         
+        uniform vec3 ambientLight;
+        uniform vec3 sunColor;
+        uniform bool isDay;
+        uniform float timeOfDay;
+        
         void main() {
-            FragColor = vec4(ourColor, 1.0);
+            vec3 color = ourColor;
+            
+            // Simple lighting based on time of day
+            float intensity = isDay ? 1.0 : 0.4;
+            
+            if (!isDay) {
+                // Night time - add blue tint
+                color = mix(color, vec3(0.2, 0.2, 0.6), 0.3);
+            }
+            
+            // Add dawn/dusk effects
+            float dawnFactor = 1.0 - abs(timeOfDay - 6.0) / 6.0;
+            if (timeOfDay > 4.0 && timeOfDay < 8.0) {
+                // Dawn/dusk - add orange/red tint
+                color = mix(color, vec3(1.0, 0.5, 0.2), dawnFactor * 0.5);
+            }
+            
+            // Simple directional lighting based on position
+            vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+            float diff = max(dot(vec3(0.0, 1.0, 0.0), lightDir), 0.0);
+            
+            FragColor = vec4(color * (intensity + diff * 0.3), 1.0);
         }
     )";
 
-    // Create and compile shaders
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
     glCompileShader(vertexShader);
+
+    int success;
+    char infoLog[512];
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        std::cerr << "Vertex shader compilation failed: " << infoLog << std::endl;
+    }
 
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
     glCompileShader(fragmentShader);
 
-    GLuint shaderProgram = glCreateProgram();
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        std::cerr << "Fragment shader compilation failed: " << infoLog << std::endl;
+    }
+
+    shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
 
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        std::cerr << "Shader program linking failed: " << infoLog << std::endl;
+    }
+
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // Create a cube
-    float vertices[] = {
-        // positions          // colors
-        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
+    std::cout << "\n=== Mars Terrain Loaded ===" << std::endl;
+    std::cout << "Map size: " << g_heightMap.getWidth() << " x " << g_heightMap.getHeight() << std::endl;
+    std::cout << "Starting position: (" << g_heightMap.getStartPosition().x << ", " << g_heightMap.getStartPosition().y << ")" << std::endl;
 
-        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
+    auto minerals = g_heightMap.getMineralPositions();
+    std::cout << "Total minerals: " << minerals.size() << std::endl;
+    std::cout << "  Blue (B): " << g_heightMap.countMineralType(TerrainType::BLUE_MINERAL) << std::endl;
+    std::cout << "  Yellow (Y): " << g_heightMap.countMineralType(TerrainType::YELLOW_MINERAL) << std::endl;
+    std::cout << "  Green (G): " << g_heightMap.countMineralType(TerrainType::GREEN_MINERAL) << std::endl;
+    std::cout << "===========================\n" << std::endl;
+    std::cout << "Controls:" << std::endl;
+    std::cout << "  WASD - Move camera" << std::endl;
+    std::cout << "  Mouse - Look around" << std::endl;
+    std::cout << "  Scroll - Zoom in/out" << std::endl;
+    std::cout << "  F1 - Toggle wireframe mode" << std::endl;
+    std::cout << "  F2 - Reset camera to top view" << std::endl;
+    std::cout << "  F3 - Toggle day/night cycle" << std::endl;
+    std::cout << "  ESC - Exit" << std::endl;
+    std::cout << "===========================\n" << std::endl;
 
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
+    float simulationSpeed = 1.0f;
+    bool isPaused = false;
 
-         0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,
-
-        -0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-
-        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f
-    };
-
-    GLuint VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    // Render loop
     while (!glfwWindowShouldClose(window)) {
         float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -174,51 +321,91 @@ int main() {
 
         processInput(window, deltaTime);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        if (!isPaused) {
+            updateDayNightCycle(deltaTime * simulationSpeed);
+        }
+
+        glm::vec3 skyColor;
+        if (g_isDay) {
+            skyColor = glm::vec3(0.5f, 0.7f, 1.0f) * 0.8f; 
+        }
+        else {
+            skyColor = glm::vec3(0.05f, 0.05f, 0.2f); 
+        }
+
+        if (g_timeOfDay > 4.0f && g_timeOfDay < 8.0f) {
+            float t = (g_timeOfDay - 4.0f) / 4.0f;
+            skyColor = glm::mix(glm::vec3(0.7f, 0.4f, 0.2f), glm::vec3(0.5f, 0.7f, 1.0f), t);
+        }
+        else if (g_timeOfDay > 16.0f && g_timeOfDay < 20.0f) {
+            float t = (g_timeOfDay - 16.0f) / 4.0f;
+            skyColor = glm::mix(glm::vec3(0.5f, 0.7f, 1.0f), glm::vec3(0.2f, 0.1f, 0.3f), t);
+        }
+
+        glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
 
-        // Pass projection matrix to shader
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), 800.0f / 600.0f, 0.1f, 100.0f);
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
-
-        // Pass view matrix to shader
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), 1200.0f / 800.0f, 0.1f, 200.0f);
         glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 terrainModel = glm::mat4(1.0f);
+
+        float terrainWidth = g_terrainRenderer.getWidth();
+        float terrainDepth = g_terrainRenderer.getDepth();
+        terrainModel = glm::translate(terrainModel, glm::vec3(-terrainWidth / 2.0f, 0.0f, -terrainDepth / 2.0f));
+        terrainModel = glm::scale(terrainModel, glm::vec3(g_terrainScale));
+
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &terrainModel[0][0]);
 
-        // Draw multiple cubes
-        glBindVertexArray(VAO);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "ambientLight"), 1, &g_ambientLight[0]);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "sunColor"), 1, &g_sunColor[0]);
+        glUniform1i(glGetUniformLocation(shaderProgram, "isDay"), g_isDay);
+        glUniform1f(glGetUniformLocation(shaderProgram, "timeOfDay"), g_timeOfDay);
 
-        glm::vec3 cubePositions[] = {
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(2.0f, 5.0f, -15.0f),
-            glm::vec3(-1.5f, -2.2f, -2.5f),
-            glm::vec3(-3.8f, -2.0f, -12.3f),
-            glm::vec3(2.4f, -0.4f, -3.5f),
-            glm::vec3(-1.7f, 3.0f, -7.5f),
-            glm::vec3(1.3f, -2.0f, -2.5f),
-            glm::vec3(1.5f, 2.0f, -2.5f),
-            glm::vec3(1.5f, 0.2f, -1.5f),
-            glm::vec3(-1.3f, 1.0f, -1.5f)
-        };
+        // Draw terrain
+        g_terrainRenderer.render(view, projection, g_showWireframe);
 
-        for (unsigned int i = 0; i < 10; i++) {
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            float angle = 20.0f * i;
-            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+        // Animate rover along planned path as a small white box
+        if (!g_roverPath.empty()) {
+            g_roverAnimTime += deltaTime;
+            while (g_roverAnimTime >= g_roverStepDuration && g_roverPathIndex + 1 < g_roverPath.size()) {
+                g_roverAnimTime -= g_roverStepDuration;
+                g_roverPathIndex++;
+            }
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            const Position& p = g_roverPath[g_roverPathIndex];
+
+            // The rover logic uses (x,y) as map indices; map[row][col] with row=x, col=y.
+            // Map that to terrain local coordinates: x -> z, y -> x so it aligns with HeightMap.
+            float cellX = static_cast<float>(p.y);
+            float cellZ = static_cast<float>(p.x);
+            float cellHeight = g_heightMap.getHeightAt(cellX, cellZ) + 0.3f;
+
+            glm::mat4 roverModel = terrainModel;
+            roverModel = glm::translate(roverModel, glm::vec3(cellX, cellHeight, cellZ));
+
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &roverModel[0][0]);
+
+            glBindVertexArray(g_roverVAO);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
+        }
+
+        // Render simple coordinate grid if enabled
+        if (g_showGrid) {
+            // Simple grid rendering would go here
+            // You could add grid lines to show cell boundaries
         }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
+    g_terrainRenderer.cleanup();
+    cleanupRoverMesh();
     glDeleteProgram(shaderProgram);
 
     glfwTerminate();
@@ -241,6 +428,65 @@ void processInput(GLFWwindow* window, float deltaTime) {
         camera.ProcessKeyboard(CameraMovement::UP, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
         camera.ProcessKeyboard(CameraMovement::DOWN, deltaTime);
+
+
+    static bool f1Pressed = false;
+    if (glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS && !f1Pressed) {
+        g_showWireframe = !g_showWireframe;
+        f1Pressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_F1) == GLFW_RELEASE) {
+        f1Pressed = false;
+    }
+
+    static bool f2Pressed = false;
+    if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS && !f2Pressed) {
+        camera.Position = glm::vec3(25.0f, 40.0f, 25.0f);
+        camera.Yaw = -90.0f;
+        camera.Pitch = -45.0f;
+        camera.updateCameraVectors();
+        f2Pressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_F2) == GLFW_RELEASE) {
+        f2Pressed = false;
+    }
+
+    static bool f3Pressed = false;
+    if (glfwGetKey(window, GLFW_KEY_F3) == GLFW_PRESS && !f3Pressed) {
+        g_showGrid = !g_showGrid;
+        f3Pressed = true;
+    }
+    if (glfwGetKey(window, GLFW_KEY_F3) == GLFW_RELEASE) {
+        f3Pressed = false;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS) {
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) {
+    }
+}
+
+void updateDayNightCycle(float deltaTime) {
+    g_timeOfDay += deltaTime * 0.5f;
+
+    if (g_timeOfDay >= 24.0f) {
+        g_timeOfDay = 0.0f;
+    }
+
+    g_isDay = (g_timeOfDay >= 6.0f && g_timeOfDay < 22.0f);
+
+    if (g_isDay) {
+        float dayProgress = (g_timeOfDay - 6.0f) / 16.0f; 
+        g_ambientLight = glm::vec3(0.8f, 0.8f, 0.7f) * (0.7f + 0.3f * sin(dayProgress * 3.14159f));
+    }
+    else {
+        float nightProgress = (g_timeOfDay - 22.0f) / 8.0f;
+        if (g_timeOfDay < 6.0f) {
+            nightProgress = (g_timeOfDay + 2.0f) / 8.0f;
+        }
+        g_ambientLight = glm::vec3(0.2f, 0.2f, 0.3f) * (0.5f + 0.5f * sin(nightProgress * 3.14159f));
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -255,7 +501,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
     }
 
     float xOffset = xpos - lastX;
-    float yOffset = lastY - ypos; // Reversed because y-coordinates go from bottom to top
+    float yOffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
