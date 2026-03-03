@@ -64,7 +64,6 @@ void Camera::ProcessMouseMovement(float xOffset, float yOffset, bool constrainPi
     Yaw += xOffset;
     Pitch += yOffset;
 
-    // Constrain pitch to avoid gimbal lock
     if (constrainPitch) {
         if (Pitch > 89.0f)
             Pitch = 89.0f;
@@ -84,14 +83,12 @@ void Camera::ProcessMouseScroll(float yOffset) {
 }
 
 void Camera::updateCameraVectors() {
-    // Calculate new Front vector
     glm::vec3 front;
     front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
     front.y = sin(glm::radians(Pitch));
     front.z = sin(glm::radians(Yaw)) * cos(glm::radians(Pitch));
     Front = glm::normalize(front);
 
-    // Recalculate Right and Up vectors
     Right = glm::normalize(glm::cross(Front, WorldUp));
     Up = glm::normalize(glm::cross(Right, Front));
 }
