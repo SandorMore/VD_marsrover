@@ -139,13 +139,10 @@ int main(int argc, char** argv) {
     }
 
     glEnable(GL_DEPTH_TEST);
-    // Disable face culling for now so terrain is visible
     glDisable(GL_CULL_FACE);
 
     std::cout << "Loading map: " << mapFile << std::endl;
 
-    // Try to load the requested map file (default: asd.txt).
-    // If it fails, generate a default map into the SAME file and load it again.
     if (!g_heightMap.loadFromCSV(mapFile)) {
         std::cerr << "Failed to load map '" << mapFile
                   << "'. Creating default 50x50 map." << std::endl;
@@ -192,7 +189,14 @@ int main(int argc, char** argv) {
         std::cerr << "Failed to read rover map from '" << mapFile << "'" << std::endl;
     } else {
         g_roverPath = buildFastRoute(g_roverMap, g_roverStart);
-        std::cout << "Fast A* route length (steps): " << g_roverPath.size() << std::endl;
+        // Apply a simple time limit: 24 hours.
+        // One step corresponds to one half-hour slot, so keep at most 24 * 2 = 48 steps.
+        const int maxStepsFor24Hours = 24 * 2;
+        if (g_roverPath.size() > static_cast<size_t>(maxStepsFor24Hours)) {
+            g_roverPath.resize(maxStepsFor24Hours);
+        }
+
+        std::cout << "Fast A* route length (steps, capped to 24h): " << g_roverPath.size() << std::endl;
     }
 
     // Setup rover mesh for visualization

@@ -130,6 +130,8 @@
     <ClCompile Include="fast_f.cpp" />
     <ClCompile Include="Heightmap.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="model_loader.cpp" />
+    <ClCompile Include="mode_loader.cpp" />
     <ClCompile Include="rover.cpp" />
     <ClCompile Include="TerrainRenderer.cpp" />
     <ClCompile Include="VisualizationHandler.cpp" />
@@ -137,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Heightmap.h" />
+    <ClInclude Include="model_loader.h" />
     <ClInclude Include="rover.h" />
     <ClInclude Include="TerrainRenderer.h" />
     <ClInclude Include="VisualizationHandler.h" />
