@@ -5,4 +5,4 @@
 ű
 
 
-dependency: openGL, GLM, Eigne?, GLFW3
+dependency: openGL, GLM, Eigne?, GLFW3, freeGlut
