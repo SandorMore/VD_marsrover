@@ -44,6 +44,7 @@ float g_timeOfDay = 6.0f;
 bool g_isDay = true;
 glm::vec3 g_ambientLight = glm::vec3(0.8f, 0.8f, 0.7f);
 glm::vec3 g_sunColor = glm::vec3(1.0f, 0.95f, 0.9f);
+glm::vec3 g_sunDirection = glm::normalize(glm::vec3(1.0f, 1.0f, 0.3f)); // direction from sun towards scene
 
 bool g_showWireframe = false;
 bool g_showGrid = true;
@@ -58,12 +59,12 @@ void setupRoverMesh() {
     float size = 0.4f;
     float y = 0.0f;
 
-    // position (3) + color (3), white color
+    // position (3) + normal (3) + color (3), white color, normal up
     float vertices[] = {
-        -size, y, -size,  1.0f, 1.0f, 1.0f,
-         size, y, -size,  1.0f, 1.0f, 1.0f,
-         size, y,  size,  1.0f, 1.0f, 1.0f,
-        -size, y,  size,  1.0f, 1.0f, 1.0f
+        -size, y, -size,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f,
+         size, y, -size,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f,
+         size, y,  size,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f,
+        -size, y,  size,   0.0f, 1.0f, 0.0f,   1.0f, 1.0f, 1.0f
     };
 
     unsigned int indices[] = {
@@ -83,11 +84,14 @@ void setupRoverMesh() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_roverEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
 }
@@ -205,57 +209,68 @@ int main(int argc, char** argv) {
     const char* vertexShaderSource = R"(
         #version 330 core
         layout (location = 0) in vec3 aPos;
-        layout (location = 1) in vec3 aColor;
+        layout (location = 1) in vec3 aNormal;
+        layout (location = 2) in vec3 aColor;
         
-        out vec3 ourColor;
-        out vec3 FragPos;
+        out vec3 vColor;
+        out vec3 vFragPos;
+        out vec3 vNormal;
         
         uniform mat4 model;
         uniform mat4 view;
         uniform mat4 projection;
-        uniform float timeOfDay;
         
         void main() {
-            FragPos = vec3(model * vec4(aPos, 1.0));
-            gl_Position = projection * view * model * vec4(aPos, 1.0);
-            ourColor = aColor;
+            vec4 worldPos = model * vec4(aPos, 1.0);
+            vFragPos = worldPos.xyz;
+            vNormal = mat3(transpose(inverse(model))) * aNormal;
+            vColor = aColor;
+            gl_Position = projection * view * worldPos;
         }
     )";
 
     const char* fragmentShaderSource = R"(
         #version 330 core
-        in vec3 ourColor;
-        in vec3 FragPos;
+        in vec3 vColor;
+        in vec3 vFragPos;
+        in vec3 vNormal;
         out vec4 FragColor;
         
         uniform vec3 ambientLight;
         uniform vec3 sunColor;
+        uniform vec3 sunDirection; // direction from sun towards scene
         uniform bool isDay;
         uniform float timeOfDay;
         
         void main() {
-            vec3 color = ourColor;
+            vec3 color = vColor;
             
-            // Simple lighting based on time of day
-            float intensity = isDay ? 1.0 : 0.4;
+            // Normalize normal and light direction
+            vec3 N = normalize(vNormal);
+            vec3 L = normalize(-sunDirection); // from fragment towards sun
             
+            // Diffuse term
+            float diff = max(dot(N, L), 0.0);
+            
+            // Ambient and directional lighting
+            vec3 ambient = ambientLight * color;
+            vec3 diffuse = sunColor * diff * color;
+            
+            // Extra tints for dawn/dusk and night
             if (!isDay) {
-                // Night time - add blue tint
-                color = mix(color, vec3(0.2, 0.2, 0.6), 0.3);
+                color = mix(color, vec3(0.15, 0.2, 0.4), 0.4);
             }
             
-            // Add dawn/dusk effects
             float dawnFactor = 1.0 - abs(timeOfDay - 6.0) / 6.0;
             if (timeOfDay > 4.0 && timeOfDay < 8.0) {
-                // Dawn/dusk - add orange/red tint
-                color = mix(color, vec3(1.0, 0.5, 0.2), dawnFactor * 0.5);
+                color = mix(color, vec3(1.0, 0.5, 0.25), clamp(dawnFactor, 0.0, 1.0) * 0.5);
             }
             
-            // Simple directional lighting based on position
-            vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-            float diff = max(dot(vec3(0.0, 1.0, 0.0), lightDir), 0.0);
+            vec3 finalColor = ambient + diffuse;
+            // Slightly modulate with tinted base color
+            finalColor *= mix(vec3(1.0), color, 0.3);
             
-            FragColor = vec4(color * (intensity + diff * 0.3), 1.0);
+            FragColor = vec4(finalColor, 1.0);
         }
     )";
 
@@ -366,6 +381,7 @@ int main(int argc, char** argv) {
 
         glUniform3fv(glGetUniformLocation(shaderProgram, "ambientLight"), 1, &g_ambientLight[0]);
         glUniform3fv(glGetUniformLocation(shaderProgram, "sunColor"), 1, &g_sunColor[0]);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "sunDirection"), 1, &g_sunDirection[0]);
         glUniform1i(glGetUniformLocation(shaderProgram, "isDay"), g_isDay);
         glUniform1f(glGetUniformLocation(shaderProgram, "timeOfDay"), g_timeOfDay);
 
@@ -480,16 +496,31 @@ void updateDayNightCycle(float deltaTime) {
 
     g_isDay = (g_timeOfDay >= 6.0f && g_timeOfDay < 22.0f);
 
+    // Compute sun direction as it orbits around the scene over a 24h sol.
+    // Use an inclined circular path: high in the sky at noon, below horizon at night.
+    float angle = glm::radians((g_timeOfDay / 24.0f) * 360.0f);
+    float elevation = sin(angle);     // -1..1
+    float horizontal = cos(angle);    // -1..1
+
+    // Slight tilt in Z to avoid perfectly symmetric lighting
+    g_sunDirection = glm::normalize(glm::vec3(horizontal, elevation, 0.3f));
+
     if (g_isDay) {
+        // Warm, bright sun during the day
         float dayProgress = (g_timeOfDay - 6.0f) / 16.0f; 
-        g_ambientLight = glm::vec3(0.8f, 0.8f, 0.7f) * (0.7f + 0.3f * sin(dayProgress * 3.14159f));
+        float intensity = 0.7f + 0.3f * sin(dayProgress * 3.14159f);
+        g_ambientLight = glm::vec3(0.7f, 0.65f, 0.6f) * intensity;
+        g_sunColor = glm::mix(glm::vec3(1.0f, 0.8f, 0.6f), glm::vec3(1.1f, 1.0f, 0.95f), dayProgress);
     }
     else {
+        // At night, ambient is cool and dim, sun becomes a dark blue directional light
         float nightProgress = (g_timeOfDay - 22.0f) / 8.0f;
         if (g_timeOfDay < 6.0f) {
             nightProgress = (g_timeOfDay + 2.0f) / 8.0f;
         }
-        g_ambientLight = glm::vec3(0.2f, 0.2f, 0.3f) * (0.5f + 0.5f * sin(nightProgress * 3.14159f));
+        float intensity = 0.3f + 0.3f * sin(glm::clamp(nightProgress, 0.0f, 1.0f) * 3.14159f);
+        g_ambientLight = glm::vec3(0.08f, 0.09f, 0.15f) * (0.5f + intensity);
+        g_sunColor = glm::vec3(0.1f, 0.15f, 0.35f) * 0.6f;
     }
 }
 

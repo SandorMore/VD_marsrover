@@ -29,6 +29,7 @@ void TerrainRenderer::generateMesh() {
 
 void TerrainRenderer::createTerrainMesh() {
     vertices.clear();
+    normals.clear();
     colors.clear();
     indices.clear();
 
@@ -51,41 +52,73 @@ void TerrainRenderer::createTerrainMesh() {
 
             GLuint baseIndex = static_cast<GLuint>(vertices.size());
 
+            // Common normals for the cube faces
+            const glm::vec3 nTop(0.0f, 1.0f, 0.0f);
+            const glm::vec3 nBottom(0.0f, -1.0f, 0.0f);
+            const glm::vec3 nFront(0.0f, 0.0f, -1.0f);
+            const glm::vec3 nBack(0.0f, 0.0f, 1.0f);
+            const glm::vec3 nLeft(-1.0f, 0.0f, 0.0f);
+            const glm::vec3 nRight(1.0f, 0.0f, 0.0f);
+
             // Top face (y = top)
             vertices.push_back(glm::vec3(x0, top, z0)); colors.push_back(color); // 0
+            normals.push_back(nTop);
             vertices.push_back(glm::vec3(x1, top, z0)); colors.push_back(color); // 1
+            normals.push_back(nTop);
             vertices.push_back(glm::vec3(x1, top, z1)); colors.push_back(color); // 2
+            normals.push_back(nTop);
             vertices.push_back(glm::vec3(x0, top, z1)); colors.push_back(color); // 3
+            normals.push_back(nTop);
 
             // Bottom face (y = bottom)
             vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 4
+            normals.push_back(nBottom);
             vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 5
+            normals.push_back(nBottom);
             vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 6
+            normals.push_back(nBottom);
             vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 7
+            normals.push_back(nBottom);
 
             // Front face (towards -Z)
             vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 8
+            normals.push_back(nFront);
             vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 9
+            normals.push_back(nFront);
             vertices.push_back(glm::vec3(x1, top,   z0)); colors.push_back(color); // 10
+            normals.push_back(nFront);
             vertices.push_back(glm::vec3(x0, top,   z0)); colors.push_back(color); // 11
+            normals.push_back(nFront);
 
             // Back face (towards +Z)
             vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 12
+            normals.push_back(nBack);
             vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 13
+            normals.push_back(nBack);
             vertices.push_back(glm::vec3(x1, top,   z1)); colors.push_back(color); // 14
+            normals.push_back(nBack);
             vertices.push_back(glm::vec3(x0, top,   z1)); colors.push_back(color); // 15
+            normals.push_back(nBack);
 
             // Left face (towards -X)
             vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 16
+            normals.push_back(nLeft);
             vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 17
+            normals.push_back(nLeft);
             vertices.push_back(glm::vec3(x0, top,   z1)); colors.push_back(color); // 18
+            normals.push_back(nLeft);
             vertices.push_back(glm::vec3(x0, top,   z0)); colors.push_back(color); // 19
+            normals.push_back(nLeft);
 
             // Right face (towards +X)
             vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 20
+            normals.push_back(nRight);
             vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 21
+            normals.push_back(nRight);
             vertices.push_back(glm::vec3(x1, top,   z1)); colors.push_back(color); // 22
+            normals.push_back(nRight);
             vertices.push_back(glm::vec3(x1, top,   z0)); colors.push_back(color); // 23
+            normals.push_back(nRight);
 
             // Top
             indices.push_back(baseIndex + 0);
@@ -147,13 +180,16 @@ void TerrainRenderer::setupBuffers() {
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
-   
     std::vector<float> interleavedData;
     for (size_t i = 0; i < vertices.size(); i++) {
 
         interleavedData.push_back(vertices[i].x);
         interleavedData.push_back(vertices[i].y);
         interleavedData.push_back(vertices[i].z);
+
+        interleavedData.push_back(normals[i].x);
+        interleavedData.push_back(normals[i].y);
+        interleavedData.push_back(normals[i].z);
 
         interleavedData.push_back(colors[i].x);
         interleavedData.push_back(colors[i].y);
@@ -163,12 +199,19 @@ void TerrainRenderer::setupBuffers() {
     glBufferData(GL_ARRAY_BUFFER, interleavedData.size() * sizeof(float),
         interleavedData.data(), GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float),
+    // normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float),
         (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // color
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float),
+        (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint),
