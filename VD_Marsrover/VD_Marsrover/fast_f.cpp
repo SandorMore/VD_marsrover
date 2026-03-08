@@ -127,9 +127,46 @@ Position findNearestMineral(const Position& rover, const std::vector<std::vector
 
 std::vector<Position> buildFastRoute(std::vector<std::vector<Cell>> map, Position start)
 {
+    // Route starts at the rover's initial position.
     std::vector<Position> route;
+    route.push_back(start);
 
     Position rover = start;
+
+    // Time and battery model according to the task description.
+    int battery = MAX_BATTERY;
+    int timeStep = 0;                      // half-hour units
+    bool isDay = true;
+    int phaseRemaining = DAY_DURATION;     // remaining half-hours in current day/night phase
+
+    auto advanceHalfHour = [&](int energyUse) -> bool {
+        // Charging during the day
+        int charge = isDay ? 10 : 0;
+        battery += charge - energyUse;
+        if (battery > MAX_BATTERY) battery = MAX_BATTERY;
+        if (battery <= 0) return false;
+
+        timeStep++;
+        phaseRemaining--;
+
+        if (phaseRemaining == 0) {
+            isDay = !isDay;
+            phaseRemaining = isDay ? DAY_DURATION : NIGHT_DURATION;
+        }
+
+        // Hard limit: 24 hours = 48 half-hour steps
+        if (timeStep >= 24 * 2) return false;
+        return true;
+    };
+
+    auto chooseSpeed = [&](int /*distToTarget*/) -> int {
+        // Simple heuristic: faster when battery is high and it's day.
+        if (isDay && battery > 70) return 3;
+        if (battery > 40) return 2;
+        return 1;
+    };
+
+    int collectedMinerals = 0;
 
     while (true)
     {
@@ -147,16 +184,51 @@ std::vector<Position> buildFastRoute(std::vector<std::vector<Cell>> map, Positio
             path))
             break;
 
-
+        // Walk along the path step-by-step, respecting battery and 24h limit.
         for (Position p : path)
         {
-            route.push_back(p);
+            int speed = chooseSpeed(simpleHeuristic(rover, target));
+            int moveEnergy = K * speed * speed;
+            if (!advanceHalfHour(moveEnergy)) {
+                // Out of time or battery; stop planning further.
+                return route;
+            }
+
+            rover = p;
+            route.push_back(rover);
         }
 
+        // We reached a mineral; simulate mining for one half-hour.
+        if (map[rover.x][rover.y].mineral != MINERAL_NONE) {
+            int mineEnergy = 2; // per spec
+            if (!advanceHalfHour(mineEnergy)) {
+                return route;
+            }
 
-        map[target.x][target.y].mineral = MINERAL_NONE;
+            map[rover.x][rover.y].mineral = MINERAL_NONE;
+            collectedMinerals++;
+        }
 
-        rover = target;
+        // If we're close to the time limit or battery is low, head back to start.
+        if (timeStep >= 24 * 2 - 8 || battery < 20) {
+            break;
+        }
+    }
+
+    // Try to return to start within remaining resources.
+    if (!(rover == start)) {
+        std::vector<Position> backPath;
+        if (findPathToTarget(rover, start, map, backPath)) {
+            for (Position p : backPath) {
+                int speed = chooseSpeed(simpleHeuristic(rover, start));
+                int moveEnergy = K * speed * speed;
+                if (!advanceHalfHour(moveEnergy)) {
+                    return route;
+                }
+                rover = p;
+                route.push_back(rover);
+            }
+        }
     }
 
     return route;
