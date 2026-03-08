@@ -344,22 +344,21 @@ int main(int argc, char** argv) {
             updateDayNightCycle(deltaTime * simulationSpeed);
         }
 
-        glm::vec3 skyColor;
-        if (g_isDay) {
-            skyColor = glm::vec3(0.5f, 0.7f, 1.0f) * 0.8f; 
-        }
-        else {
-            skyColor = glm::vec3(0.05f, 0.05f, 0.2f); 
-        }
+        // Smooth, continuous sky color over a full Martian sol.
+        float tDay = g_timeOfDay / 24.0f;                   // 0..1
+        float angle = tDay * 6.2831853f;                    // 0..2π
+        float elev = sin(angle);                            // -1..1
 
-        if (g_timeOfDay > 4.0f && g_timeOfDay < 8.0f) {
-            float t = (g_timeOfDay - 4.0f) / 4.0f;
-            skyColor = glm::mix(glm::vec3(0.7f, 0.4f, 0.2f), glm::vec3(0.5f, 0.7f, 1.0f), t);
-        }
-        else if (g_timeOfDay > 16.0f && g_timeOfDay < 20.0f) {
-            float t = (g_timeOfDay - 16.0f) / 4.0f;
-            skyColor = glm::mix(glm::vec3(0.5f, 0.7f, 1.0f), glm::vec3(0.2f, 0.1f, 0.3f), t);
-        }
+        glm::vec3 daySky   = glm::vec3(0.45f, 0.68f, 1.0f);
+        glm::vec3 duskSky  = glm::vec3(0.8f, 0.45f, 0.25f);
+        glm::vec3 nightSky = glm::vec3(0.03f, 0.04f, 0.08f);
+
+        float dayFactor = glm::clamp((elev + 0.1f) / 1.1f, 0.0f, 1.0f);
+        float duskFactor = 1.0f - fabs(elev) * 1.3f;
+        duskFactor = glm::clamp(duskFactor, 0.0f, 1.0f);
+
+        glm::vec3 skyColor = glm::mix(nightSky, daySky, dayFactor);
+        skyColor = glm::mix(skyColor, duskSky, duskFactor * 0.7f);
 
         glClearColor(skyColor.r, skyColor.g, skyColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

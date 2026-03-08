@@ -35,138 +35,166 @@ void TerrainRenderer::createTerrainMesh() {
 
     float cellSize = 1.0f;
 
-    // For each cell we build a full block (column) from y=0 to y=height,
-    // with 6 faces (top + bottom + 4 sides). This removes cracks between cells
-    // and gives a true voxel-like look.
+    // Helper to add a single rectangular block covering [x0,x1]x[z0,z1] from bottom to top.
+    auto addBlock = [&](float x0, float x1, float z0, float z1, float bottom, float top, const glm::vec3& color) {
+        GLuint baseIndex = static_cast<GLuint>(vertices.size());
+
+        const glm::vec3 nTop(0.0f, 1.0f, 0.0f);
+        const glm::vec3 nBottom(0.0f, -1.0f, 0.0f);
+        const glm::vec3 nFront(0.0f, 0.0f, -1.0f);
+        const glm::vec3 nBack(0.0f, 0.0f, 1.0f);
+        const glm::vec3 nLeft(-1.0f, 0.0f, 0.0f);
+        const glm::vec3 nRight(1.0f, 0.0f, 0.0f);
+
+        // Top face
+        vertices.push_back(glm::vec3(x0, top, z0)); normals.push_back(nTop); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top, z0)); normals.push_back(nTop); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top, z1)); normals.push_back(nTop); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, top, z1)); normals.push_back(nTop); colors.push_back(color);
+
+        // Bottom face
+        vertices.push_back(glm::vec3(x0, bottom, z0)); normals.push_back(nBottom); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, bottom, z0)); normals.push_back(nBottom); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, bottom, z1)); normals.push_back(nBottom); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, bottom, z1)); normals.push_back(nBottom); colors.push_back(color);
+
+        // Front face (-Z)
+        vertices.push_back(glm::vec3(x0, bottom, z0)); normals.push_back(nFront); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, bottom, z0)); normals.push_back(nFront); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top,   z0)); normals.push_back(nFront); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, top,   z0)); normals.push_back(nFront); colors.push_back(color);
+
+        // Back face (+Z)
+        vertices.push_back(glm::vec3(x0, bottom, z1)); normals.push_back(nBack); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, bottom, z1)); normals.push_back(nBack); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top,   z1)); normals.push_back(nBack); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, top,   z1)); normals.push_back(nBack); colors.push_back(color);
+
+        // Left face (-X)
+        vertices.push_back(glm::vec3(x0, bottom, z0)); normals.push_back(nLeft); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, bottom, z1)); normals.push_back(nLeft); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, top,   z1)); normals.push_back(nLeft); colors.push_back(color);
+        vertices.push_back(glm::vec3(x0, top,   z0)); normals.push_back(nLeft); colors.push_back(color);
+
+        // Right face (+X)
+        vertices.push_back(glm::vec3(x1, bottom, z0)); normals.push_back(nRight); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, bottom, z1)); normals.push_back(nRight); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top,   z1)); normals.push_back(nRight); colors.push_back(color);
+        vertices.push_back(glm::vec3(x1, top,   z0)); normals.push_back(nRight); colors.push_back(color);
+
+        // Top
+        indices.push_back(baseIndex + 0);
+        indices.push_back(baseIndex + 1);
+        indices.push_back(baseIndex + 2);
+        indices.push_back(baseIndex + 0);
+        indices.push_back(baseIndex + 2);
+        indices.push_back(baseIndex + 3);
+
+        // Bottom
+        indices.push_back(baseIndex + 4);
+        indices.push_back(baseIndex + 6);
+        indices.push_back(baseIndex + 5);
+        indices.push_back(baseIndex + 4);
+        indices.push_back(baseIndex + 7);
+        indices.push_back(baseIndex + 6);
+
+        // Front
+        indices.push_back(baseIndex + 8);
+        indices.push_back(baseIndex + 9);
+        indices.push_back(baseIndex + 10);
+        indices.push_back(baseIndex + 8);
+        indices.push_back(baseIndex + 10);
+        indices.push_back(baseIndex + 11);
+
+        // Back
+        indices.push_back(baseIndex + 12);
+        indices.push_back(baseIndex + 14);
+        indices.push_back(baseIndex + 13);
+        indices.push_back(baseIndex + 12);
+        indices.push_back(baseIndex + 15);
+        indices.push_back(baseIndex + 14);
+
+        // Left
+        indices.push_back(baseIndex + 16);
+        indices.push_back(baseIndex + 18);
+        indices.push_back(baseIndex + 17);
+        indices.push_back(baseIndex + 16);
+        indices.push_back(baseIndex + 19);
+        indices.push_back(baseIndex + 18);
+
+        // Right
+        indices.push_back(baseIndex + 20);
+        indices.push_back(baseIndex + 21);
+        indices.push_back(baseIndex + 22);
+        indices.push_back(baseIndex + 20);
+        indices.push_back(baseIndex + 22);
+        indices.push_back(baseIndex + 23);
+    };
+
+    // Track which obstacle cells are already merged into a larger block.
+    std::vector<std::vector<bool>> obstacleUsed(
+        mapDepth, std::vector<bool>(mapWidth, false));
+
     for (int z = 0; z < mapDepth; z++) {
         for (int x = 0; x < mapWidth; x++) {
             TerrainCell cell = map->getCell(x, z);
-            float top = cell.height;
-            float bottom = 0.0f;
-            glm::vec3 color = cell.color;
 
-            float x0 = x * cellSize;
-            float x1 = (x + 1) * cellSize;
-            float z0 = z * cellSize;
-            float z1 = (z + 1) * cellSize;
+            if (cell.type == TerrainType::OBSTACLE) {
+                if (obstacleUsed[z][x]) continue;
 
-            GLuint baseIndex = static_cast<GLuint>(vertices.size());
+                // Grow a maximal rectangle of adjacent obstacles starting at (x,z).
+                int xEnd = x;
+                while (xEnd < mapWidth &&
+                       map->getCell(xEnd, z).type == TerrainType::OBSTACLE &&
+                       !obstacleUsed[z][xEnd]) {
+                    xEnd++;
+                }
 
-            // Common normals for the cube faces
-            const glm::vec3 nTop(0.0f, 1.0f, 0.0f);
-            const glm::vec3 nBottom(0.0f, -1.0f, 0.0f);
-            const glm::vec3 nFront(0.0f, 0.0f, -1.0f);
-            const glm::vec3 nBack(0.0f, 0.0f, 1.0f);
-            const glm::vec3 nLeft(-1.0f, 0.0f, 0.0f);
-            const glm::vec3 nRight(1.0f, 0.0f, 0.0f);
+                int zEnd = z + 1;
+                bool canExpand = true;
+                while (zEnd < mapDepth && canExpand) {
+                    for (int xi = x; xi < xEnd; ++xi) {
+                        if (map->getCell(xi, zEnd).type != TerrainType::OBSTACLE ||
+                            obstacleUsed[zEnd][xi]) {
+                            canExpand = false;
+                            break;
+                        }
+                    }
+                    if (canExpand) {
+                        zEnd++;
+                    }
+                }
 
-            // Top face (y = top)
-            vertices.push_back(glm::vec3(x0, top, z0)); colors.push_back(color); // 0
-            normals.push_back(nTop);
-            vertices.push_back(glm::vec3(x1, top, z0)); colors.push_back(color); // 1
-            normals.push_back(nTop);
-            vertices.push_back(glm::vec3(x1, top, z1)); colors.push_back(color); // 2
-            normals.push_back(nTop);
-            vertices.push_back(glm::vec3(x0, top, z1)); colors.push_back(color); // 3
-            normals.push_back(nTop);
+                // Create one big block for this rectangle.
+                float top = cell.height;
+                float bottom = 0.0f;
+                glm::vec3 color = cell.color;
 
-            // Bottom face (y = bottom)
-            vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 4
-            normals.push_back(nBottom);
-            vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 5
-            normals.push_back(nBottom);
-            vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 6
-            normals.push_back(nBottom);
-            vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 7
-            normals.push_back(nBottom);
+                float x0 = x * cellSize;
+                float x1 = xEnd * cellSize;
+                float z0 = z * cellSize;
+                float z1 = zEnd * cellSize;
 
-            // Front face (towards -Z)
-            vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 8
-            normals.push_back(nFront);
-            vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 9
-            normals.push_back(nFront);
-            vertices.push_back(glm::vec3(x1, top,   z0)); colors.push_back(color); // 10
-            normals.push_back(nFront);
-            vertices.push_back(glm::vec3(x0, top,   z0)); colors.push_back(color); // 11
-            normals.push_back(nFront);
+                addBlock(x0, x1, z0, z1, bottom, top, color);
 
-            // Back face (towards +Z)
-            vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 12
-            normals.push_back(nBack);
-            vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 13
-            normals.push_back(nBack);
-            vertices.push_back(glm::vec3(x1, top,   z1)); colors.push_back(color); // 14
-            normals.push_back(nBack);
-            vertices.push_back(glm::vec3(x0, top,   z1)); colors.push_back(color); // 15
-            normals.push_back(nBack);
+                for (int zz = z; zz < zEnd; ++zz) {
+                    for (int xx = x; xx < xEnd; ++xx) {
+                        obstacleUsed[zz][xx] = true;
+                    }
+                }
+            } else {
+                // Non-obstacle cells remain as individual 1x1 columns.
+                float top = cell.height;
+                float bottom = 0.0f;
+                glm::vec3 color = cell.color;
 
-            // Left face (towards -X)
-            vertices.push_back(glm::vec3(x0, bottom, z0)); colors.push_back(color); // 16
-            normals.push_back(nLeft);
-            vertices.push_back(glm::vec3(x0, bottom, z1)); colors.push_back(color); // 17
-            normals.push_back(nLeft);
-            vertices.push_back(glm::vec3(x0, top,   z1)); colors.push_back(color); // 18
-            normals.push_back(nLeft);
-            vertices.push_back(glm::vec3(x0, top,   z0)); colors.push_back(color); // 19
-            normals.push_back(nLeft);
+                float x0 = x * cellSize;
+                float x1 = (x + 1) * cellSize;
+                float z0 = z * cellSize;
+                float z1 = (z + 1) * cellSize;
 
-            // Right face (towards +X)
-            vertices.push_back(glm::vec3(x1, bottom, z0)); colors.push_back(color); // 20
-            normals.push_back(nRight);
-            vertices.push_back(glm::vec3(x1, bottom, z1)); colors.push_back(color); // 21
-            normals.push_back(nRight);
-            vertices.push_back(glm::vec3(x1, top,   z1)); colors.push_back(color); // 22
-            normals.push_back(nRight);
-            vertices.push_back(glm::vec3(x1, top,   z0)); colors.push_back(color); // 23
-            normals.push_back(nRight);
-
-            // Top
-            indices.push_back(baseIndex + 0);
-            indices.push_back(baseIndex + 1);
-            indices.push_back(baseIndex + 2);
-            indices.push_back(baseIndex + 0);
-            indices.push_back(baseIndex + 2);
-            indices.push_back(baseIndex + 3);
-
-            // Bottom
-            indices.push_back(baseIndex + 4);
-            indices.push_back(baseIndex + 6);
-            indices.push_back(baseIndex + 5);
-            indices.push_back(baseIndex + 4);
-            indices.push_back(baseIndex + 7);
-            indices.push_back(baseIndex + 6);
-
-            // Front
-            indices.push_back(baseIndex + 8);
-            indices.push_back(baseIndex + 9);
-            indices.push_back(baseIndex + 10);
-            indices.push_back(baseIndex + 8);
-            indices.push_back(baseIndex + 10);
-            indices.push_back(baseIndex + 11);
-
-            // Back
-            indices.push_back(baseIndex + 12);
-            indices.push_back(baseIndex + 14);
-            indices.push_back(baseIndex + 13);
-            indices.push_back(baseIndex + 12);
-            indices.push_back(baseIndex + 15);
-            indices.push_back(baseIndex + 14);
-
-            // Left
-            indices.push_back(baseIndex + 16);
-            indices.push_back(baseIndex + 18);
-            indices.push_back(baseIndex + 17);
-            indices.push_back(baseIndex + 16);
-            indices.push_back(baseIndex + 19);
-            indices.push_back(baseIndex + 18);
-
-            // Right
-            indices.push_back(baseIndex + 20);
-            indices.push_back(baseIndex + 21);
-            indices.push_back(baseIndex + 22);
-            indices.push_back(baseIndex + 20);
-            indices.push_back(baseIndex + 22);
-            indices.push_back(baseIndex + 23);
+                addBlock(x0, x1, z0, z1, bottom, top, color);
+            }
         }
     }
 }
