@@ -493,8 +493,6 @@ void updateDayNightCycle(float deltaTime) {
         g_timeOfDay = 0.0f;
     }
 
-    g_isDay = (g_timeOfDay >= 6.0f && g_timeOfDay < 22.0f);
-
     // Compute sun direction as it orbits around the scene over a 24h sol.
     // Use an inclined circular path: high in the sky at noon, below horizon at night.
     float angle = glm::radians((g_timeOfDay / 24.0f) * 360.0f);
@@ -504,23 +502,41 @@ void updateDayNightCycle(float deltaTime) {
     // Slight tilt in Z to avoid perfectly symmetric lighting
     g_sunDirection = glm::normalize(glm::vec3(horizontal, elevation, 0.3f));
 
-    if (g_isDay) {
-        // Warm, bright sun during the day
-        float dayProgress = (g_timeOfDay - 6.0f) / 16.0f; 
-        float intensity = 0.7f + 0.3f * sin(dayProgress * 3.14159f);
-        g_ambientLight = glm::vec3(0.7f, 0.65f, 0.6f) * intensity;
-        g_sunColor = glm::mix(glm::vec3(1.0f, 0.8f, 0.6f), glm::vec3(1.1f, 1.0f, 0.95f), dayProgress);
-    }
-    else {
-        // At night, ambient is cool and dim, sun becomes a dark blue directional light
-        float nightProgress = (g_timeOfDay - 22.0f) / 8.0f;
-        if (g_timeOfDay < 6.0f) {
-            nightProgress = (g_timeOfDay + 2.0f) / 8.0f;
-        }
-        float intensity = 0.3f + 0.3f * sin(glm::clamp(nightProgress, 0.0f, 1.0f) * 3.14159f);
-        g_ambientLight = glm::vec3(0.08f, 0.09f, 0.15f) * (0.5f + intensity);
-        g_sunColor = glm::vec3(0.1f, 0.15f, 0.35f) * 0.6f;
-    }
+    // Smooth day/night factor from sun elevation.
+    // elevation ~ 1   -> full day
+    // elevation ~ 0   -> dusk/dawn
+    // elevation ~ -1  -> full night
+    float dayFactor = glm::clamp((elevation + 0.15f) / 1.15f, 0.0f, 1.0f);
+    float nightFactor = 1.0f - dayFactor;
+
+    // For other logic we still expose a boolean, but derived smoothly.
+    g_isDay = dayFactor > 0.35f;
+
+    // Base colors
+    glm::vec3 dayAmbient  = glm::vec3(0.7f, 0.65f, 0.6f);
+    glm::vec3 nightAmbient = glm::vec3(0.05f, 0.06f, 0.10f);
+
+    glm::vec3 warmSun = glm::vec3(1.0f, 0.85f, 0.65f);
+    glm::vec3 whiteSun = glm::vec3(1.05f, 1.0f, 0.95f);
+    glm::vec3 moonBlue = glm::vec3(0.1f, 0.15f, 0.35f);
+
+    // Dusk/dawn warm accent strongest near horizon (elevation ~ 0).
+    float duskFactor = 1.0f - fabs(elevation) * 1.3f;
+    duskFactor = glm::clamp(duskFactor, 0.0f, 1.0f);
+
+    // Ambient smoothly blends between night and day.
+    float ambIntensityDay = 0.4f + 0.4f * dayFactor;
+    float ambIntensityNight = 0.2f + 0.3f * nightFactor;
+    g_ambientLight =
+        glm::mix(nightAmbient * ambIntensityNight,
+                 dayAmbient * ambIntensityDay,
+                 dayFactor);
+
+    // Sun color: blue and dim at night, warm/white at day, with extra orange at dusk/dawn.
+    glm::vec3 daySun = glm::mix(warmSun, whiteSun, dayFactor);
+    glm::vec3 baseSun = glm::mix(moonBlue * 0.6f, daySun, dayFactor);
+    glm::vec3 duskTint = glm::vec3(1.1f, 0.6f, 0.3f);
+    g_sunColor = glm::mix(baseSun, duskTint, duskFactor * 0.6f);
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
