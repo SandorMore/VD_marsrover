@@ -253,7 +253,8 @@ pair<vector<LogEntry>, int>
 aStarSearch(
     int maxTime,
     const vector<vector<Cell>>& map,
-    const Position& startPos)
+    const Position& startPos,
+    int timeLimitMs)
 {
     auto t0 = chrono::steady_clock::now();
 
@@ -276,9 +277,25 @@ aStarSearch(
 
     int iterations = 0;
 
+    // Hard time limit for search to keep UI responsive (in milliseconds)
+    const int TIME_LIMIT_MS = max(50, timeLimitMs);
+
     while (!open.empty())
     {
         iterations++;
+
+        // Periodically check elapsed time and stop if we exceed the budget.
+        if (iterations % 1000 == 0)
+        {
+            auto tNow = chrono::steady_clock::now();
+            auto elapsed = chrono::duration_cast<chrono::milliseconds>(tNow - t0).count();
+            if (elapsed > TIME_LIMIT_MS)
+            {
+                cout << "A* search time limit reached after " << iterations
+                     << " iterations, best minerals so far = " << bestMinerals << endl;
+                break;
+            }
+        }
 
         AStarNode cur = open.top();
         open.pop();
@@ -358,7 +375,9 @@ aStarSearch(
         }
     }
 
-    cout << "Iterations = " << iterations << endl;
+    auto tEnd = chrono::steady_clock::now();
+    auto totalMs = chrono::duration_cast<chrono::milliseconds>(tEnd - t0).count();
+    cout << "Iterations = " << iterations << ", time = " << totalMs << " ms" << endl;
 
     return make_pair(bestState.log, bestMinerals);
 }

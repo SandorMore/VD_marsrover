@@ -145,7 +145,7 @@ void updateTime(RoverState& state);
 bool readMap(const std::string& filename, std::vector<std::vector<Cell>>& map, Position& startPos);
 
 std::pair<std::vector<LogEntry>, int>
-    aStarSearch(int maxTime, const std::vector<std::vector<Cell>>& map, const Position& startPos);
+    aStarSearch(int maxTime, const std::vector<std::vector<Cell>>& map, const Position& startPos, int timeLimitMs = 2000);
 
 void saveLogToFile(const std::vector<LogEntry>& log, const std::string& filename);
 
