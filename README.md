@@ -11,3 +11,5 @@ majd a freeglutot eldontjuk hogyan kellene felhasznalni vagy jelenleg amit b√≠r√
 biro dashboard pls
 
 GG
+
+its joever DXDD
